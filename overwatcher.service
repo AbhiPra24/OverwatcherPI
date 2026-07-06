@@ -1,0 +1,19 @@
+[Unit]
+Description=OverwatcherPI Network & Environment Monitor Daemon
+After=network-online.target bluetooth.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=abhipra
+Group=bluetooth
+WorkingDirectory=/home/abhipra/Work/OverwatcherPI
+# Ensure the virtual environment's python is used
+ExecStart=/home/abhipra/Work/OverwatcherPI/venv/bin/python main.py
+Restart=on-failure
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
