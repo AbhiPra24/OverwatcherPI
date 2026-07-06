@@ -17,9 +17,9 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/network - Scan local subnet\n"
         "/bluetooth - Scan nearby BLE devices\n"
         "/speedtest - Check internet speed\n"
-        "/whitelist <mac> - Mark a device as safe\n"
-        "/monitor <ip> - Pin host for ping monitor\n"
-        "/unmonitor <ip> - Remove host from ping monitor"
+        "/whitelist &lt;mac&gt; - Mark a device as safe\n"
+        "/monitor &lt;ip&gt; - Pin host for ping monitor\n"
+        "/unmonitor &lt;ip&gt; - Remove host from ping monitor"
     )
     await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
