@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     hourly_report_enabled: bool = True
     ble_scan_timeout: float = 10.0
     ble_adapter: str = "hci0"
+    sweep_interval_minutes: int = 5
+    speedtest_interval_hours: int = 3
 
 
 # Singleton instance for the application

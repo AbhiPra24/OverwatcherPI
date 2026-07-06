@@ -11,12 +11,9 @@ async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYP
     logger.error("Exception while handling an update:", exc_info=context.error)
     if isinstance(update, Update) and update.effective_message:
         try:
-            await update.effective_message.edit_text(f"⚠️ An error occurred: {context.error}")
+            await update.effective_message.reply_text(f"⚠️ An error occurred: {context.error}")
         except Exception:
-            try:
-                await update.effective_message.reply_text(f"⚠️ An error occurred: {context.error}")
-            except Exception:
-                pass
+            pass
 
 
 def setup_application(post_init_hook=None):
@@ -26,9 +23,20 @@ def setup_application(post_init_hook=None):
     async def internal_post_init(app):
         if post_init_hook:
             await post_init_hook(app)
-        from core.ssh_watcher import ssh_log_watcher
+        
         import asyncio
-        asyncio.create_task(ssh_log_watcher(app))
+        from core.ssh_watcher import ssh_log_watcher
+        
+        async def supervisor():
+            while True:
+                try:
+                    await ssh_log_watcher(app)
+                except Exception as e:
+                    logger.error(f"SSH watcher crashed: {e}")
+                logger.warning("SSH watcher exited. Restarting in 10s...")
+                await asyncio.sleep(10)
+                
+        app.ssh_watcher_task = asyncio.create_task(supervisor())
         
     builder.post_init(internal_post_init)
         

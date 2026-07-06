@@ -1,10 +1,13 @@
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
+import asyncio
+import speedtest
 
 from bot.middleware import auth_required
 from bot import formatters
 from utils import metrics
+from utils.osint import get_ip_info
 from scanners import network, bluetooth
 from core.database import DatabaseManager
 
@@ -18,6 +21,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/bluetooth - Scan nearby BLE devices\n"
         "/speedtest - Check internet speed\n"
         "/whitelist &lt;mac&gt; - Mark a device as safe\n"
+        "/attacker &lt;ip&gt; - WHOIS OSINT lookup\n"
         "/monitor &lt;ip&gt; - Pin host for ping monitor\n"
         "/unmonitor &lt;ip&gt; - Remove host from ping monitor"
     )
@@ -55,10 +59,6 @@ async def bluetooth_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await msg.edit_text(f"❌ <b>Scan failed:</b> {str(e)}", parse_mode=ParseMode.HTML)
 
-
-import speedtest
-import asyncio
-
 @auth_required
 async def speedtest_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("🚀 <i>Running Speedtest... (this may take a minute)</i>", parse_mode=ParseMode.HTML)
@@ -87,8 +87,21 @@ async def whitelist_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Please provide a MAC address: /whitelist 00:11:22:33:44:55")
         return
     mac = context.args[0].upper()
-    await DatabaseManager.mark_known(mac)
-    await update.message.reply_text(f"✅ Whitelisted MAC: {mac}")
+    success = await DatabaseManager.mark_known(mac)
+    if success:
+        await update.message.reply_text(f"✅ Whitelisted MAC: {mac}")
+    else:
+        await update.message.reply_text(f"⚠️ MAC {mac} not found in database.")
+
+@auth_required
+async def attacker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Please provide an IP: /attacker 8.8.8.8")
+        return
+    ip = context.args[0]
+    await update.message.reply_text(f"🔍 <i>Looking up OSINT for {ip}...</i>", parse_mode=ParseMode.HTML)
+    info = await get_ip_info(ip)
+    await update.message.reply_text(f"🌐 <b>OSINT for <code>{ip}</code>:</b>\n<pre>{info}</pre>", parse_mode=ParseMode.HTML)
 
 @auth_required
 async def monitor_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

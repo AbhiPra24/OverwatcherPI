@@ -116,15 +116,15 @@ class DatabaseManager:
         await db.commit()
         
         # Add is_known column if it doesn't exist (schema migration)
-        try:
+        cursor = await db.execute("PRAGMA table_info(network_devices)")
+        cols = [row["name"] for row in await cursor.fetchall()]
+        if "is_known" not in cols:
             await db.execute("ALTER TABLE network_devices ADD COLUMN is_known INTEGER DEFAULT 0")
-        except Exception:
-            pass
             
-        try:
+        cursor = await db.execute("PRAGMA table_info(bt_devices)")
+        cols = [row["name"] for row in await cursor.fetchall()]
+        if "is_known" not in cols:
             await db.execute("ALTER TABLE bt_devices ADD COLUMN is_known INTEGER DEFAULT 0")
-        except Exception:
-            pass
             
         logger.info("Database tables initialized.")
 
@@ -300,7 +300,7 @@ class DatabaseManager:
     @classmethod
     async def remove_monitored_host(cls, ip: str) -> bool:
         db = await cls.get_db()
-        cur = await db.execute("DELETE FROM monitored_hosts WHERE ip = ?", (ip,))
+        cur = await db.execute("UPDATE monitored_hosts SET is_active = 0 WHERE ip = ?", (ip,))
         await db.commit()
         return cur.rowcount > 0
 
