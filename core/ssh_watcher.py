@@ -63,15 +63,19 @@ async def ssh_log_watcher(app: Application):
                         # Alert exactly on the 5th attempt in the window to avoid spamming
                         if len(failed_attempts[ip]) == 5:
                             safe_ip = html.escape(ip)
-                            osint_data = await get_ip_info(ip)
-                            try:
-                                await app.bot.send_message(
-                                    chat_id=config.telegram_owner_id,
-                                    text=f"🚨 <b>SSH Brute Force Detected:</b>\n5 failed logins in 10 mins from IP: <code>{safe_ip}</code>\n\n<b>OSINT Data:</b>\n<pre>{html.escape(osint_data)}</pre>",
-                                    parse_mode=ParseMode.HTML
-                                )
-                            except Exception:
-                                pass
+                            
+                            async def send_alert(alert_ip, escaped_ip):
+                                osint_data = await get_ip_info(alert_ip)
+                                try:
+                                    await app.bot.send_message(
+                                        chat_id=config.telegram_owner_id,
+                                        text=f"🚨 <b>SSH Brute Force Detected:</b>\n5 failed logins in 10 mins from IP: <code>{escaped_ip}</code>\n\n<b>OSINT Data:</b>\n<pre>{html.escape(osint_data)}</pre>",
+                                        parse_mode=ParseMode.HTML
+                                    )
+                                except Exception as e:
+                                    logger.error(f"Failed to send SSH alert: {e}")
+                                    
+                            asyncio.create_task(send_alert(ip, safe_ip))
                                 
             elif "Accepted password" in line or "Accepted publickey" in line:
                 parts = line.split()

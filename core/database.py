@@ -31,6 +31,7 @@ class HourlyStats(BaseModel):
     new_macs: List[str]
     gone_macs: List[str]
     ble_device_count: int
+    unwhitelisted_count: int = 0
 
 
 class DatabaseManager:
@@ -276,11 +277,16 @@ class DatabaseManager:
         )
         bt_count = (await cursor.fetchone())["count"]
         
+        # Active unwhitelisted devices
+        cursor = await db.execute("SELECT COUNT(*) as count FROM network_devices WHERE is_active = 1 AND is_known = 0")
+        unwhitelisted_count = (await cursor.fetchone())["count"]
+        
         return HourlyStats(
             avg_network_devices=round(avg_count, 1),
             new_macs=new_macs,
             gone_macs=gone_macs,
-            ble_device_count=bt_count
+            ble_device_count=bt_count,
+            unwhitelisted_count=unwhitelisted_count
         )
 
     # OUI Cache Methods

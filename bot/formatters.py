@@ -78,6 +78,10 @@ def format_hourly_report(stats: HourlyStats) -> str:
         ""
     ]
     
+    if stats.unwhitelisted_count > 0:
+        lines.append(f"⚠️ <b>{stats.unwhitelisted_count} device(s) still unwhitelisted!</b>")
+        lines.append("")
+        
     if stats.new_macs:
         lines.append("🆕 <b>New Devices Appeared:</b>")
         for mac in stats.new_macs:
