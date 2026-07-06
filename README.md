@@ -37,7 +37,13 @@ A fully async, modular, open-source daemon that streams telemetry to a secure Te
    ```
    *(You may need to log out and back in for this to take effect).*
 
-4. **Configuration:**
+4. **Nmap Permissions (Crucial for Network Sweeps):**
+   To allow nmap to run privileged scans without root access, grant it raw socket capabilities:
+   ```bash
+   sudo setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip $(which nmap)
+   ```
+
+5. **Configuration:**
    ```bash
    cp .env.example .env
    # Edit .env and provide your Telegram Bot Token and your Telegram User ID

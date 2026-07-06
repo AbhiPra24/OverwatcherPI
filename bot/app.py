@@ -1,18 +1,36 @@
 import logging
-from telegram.ext import ApplicationBuilder, CommandHandler
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from bot import handlers
 from config import config
 
 logger = logging.getLogger(__name__)
 
+async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.error("Exception while handling an update:", exc_info=context.error)
+    if isinstance(update, Update) and update.effective_message:
+        try:
+            await update.effective_message.edit_text(f"⚠️ An error occurred: {context.error}")
+        except Exception:
+            try:
+                await update.effective_message.reply_text(f"⚠️ An error occurred: {context.error}")
+            except Exception:
+                pass
+
 
 def setup_application(post_init_hook=None):
     """Create and configure the Telegram bot application."""
     builder = ApplicationBuilder().token(config.telegram_bot_token.get_secret_value())
     
-    if post_init_hook:
-        builder.post_init(post_init_hook)
+    async def internal_post_init(app):
+        if post_init_hook:
+            await post_init_hook(app)
+        from core.ssh_watcher import ssh_log_watcher
+        import asyncio
+        asyncio.create_task(ssh_log_watcher(app))
+        
+    builder.post_init(internal_post_init)
         
     app = builder.build()
     
@@ -20,5 +38,11 @@ def setup_application(post_init_hook=None):
     app.add_handler(CommandHandler("status", handlers.status_handler))
     app.add_handler(CommandHandler("network", handlers.network_handler))
     app.add_handler(CommandHandler("bluetooth", handlers.bluetooth_handler))
+    app.add_handler(CommandHandler("speedtest", handlers.speedtest_handler))
+    app.add_handler(CommandHandler("whitelist", handlers.whitelist_handler))
+    app.add_handler(CommandHandler("monitor", handlers.monitor_handler))
+    app.add_handler(CommandHandler("unmonitor", handlers.unmonitor_handler))
+    
+    app.add_error_handler(global_error_handler)
     
     return app

@@ -14,6 +14,7 @@ def format_status(status: SystemStatus) -> str:
         "🖥 <b>System Status (Raspberry Pi)</b>",
         "<code>─────────────────────────</code>",
         f"🌡 <b>Temperature:</b> {status.temp_celsius:.1f} °C",
+        f"⚡ <b>Power/Throttling:</b> {status.throttling_status}",
         f"⏱ <b>Uptime:</b> {status.uptime_seconds / 3600:.1f} hours",
         "",
         "💾 <b>Memory:</b>",
