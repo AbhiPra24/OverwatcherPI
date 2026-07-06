@@ -36,7 +36,8 @@ def setup_application(post_init_hook=None):
                 logger.warning("SSH watcher exited. Restarting in 10s...")
                 await asyncio.sleep(10)
                 
-        app.ssh_watcher_task = asyncio.create_task(supervisor())
+        task = asyncio.create_task(supervisor())
+        app.bot_data["ssh_watcher_task"] = task
         
     builder.post_init(internal_post_init)
         
