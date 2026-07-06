@@ -3,11 +3,13 @@
 A fully async, modular, open-source daemon that streams telemetry to a secure Telegram Bot. It performs differential network surveillance, BLE discovery, and hourly trend analytics. Designed for Raspberry Pi 5 (8 GB RAM), Linux.
 
 ## Features
-- **Network Surveillance:** Fast `nmap` based ARP sweeps of the local subnet.
+- **Network Surveillance:** Fast `nmap` based ARP sweeps of the local subnet, enhanced with `zeroconf` mDNS discovery.
 - **BLE Discovery:** Async Bluetooth Low Energy scanning via `bleak`.
 - **Differential Tracking:** Automatically diffs current topology against baseline and flags new devices.
-- **Hourly Reports:** Automatically sends trend reports to the owner.
-- **System Diagnostics:** Reports Pi CPU, RAM, Disk, and SoC temperature.
+- **Intruder Defense:** Runs targeted `nmap -sV` port scans on unknown devices before alerting you.
+- **Ping Monitor:** Pin critical infrastructure hosts for constant 1-minute uptime checks.
+- **SSH Auth Monitoring:** Actively tails `/var/log/auth.log` for brute-force attacks and successful logins.
+- **System Diagnostics:** Reports Pi CPU, RAM, Disk, SoC temperature, and checks for under-voltage/throttling events.
 
 ## Hardware & OS Requirements
 - Raspberry Pi (optimized for Pi 5 8GB)
@@ -73,6 +75,10 @@ The recommended deployment path is `/opt/OverwatcherPI/`.
    ```
 
 ## Telegram Commands
-- `/status` — Get Raspberry Pi system health
+- `/status` — Get Raspberry Pi system health & throttling status
 - `/network` — Trigger immediate local subnet sweep
 - `/bluetooth` — Trigger immediate 10-second BLE discovery
+- `/speedtest` — Run internet speed test
+- `/whitelist <mac>` — Mark a device MAC as safe
+- `/monitor <ip>` — Pin a critical host for 1-minute downtime checks
+- `/unmonitor <ip>` — Remove a host from ping monitor
