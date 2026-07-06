@@ -3,6 +3,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional, List, Tuple, Set
 
+import asyncio
 import aiosqlite
 from pydantic import BaseModel
 
@@ -36,24 +37,27 @@ class DatabaseManager:
     """Singleton database manager handling connections and queries."""
     
     _db: Optional[aiosqlite.Connection] = None
+    _lock = asyncio.Lock()
 
     @classmethod
     async def get_db(cls) -> aiosqlite.Connection:
         if cls._db is None:
-            # Ensure directory exists
-            config.db_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            cls._db = await aiosqlite.connect(config.db_path)
-            cls._db.row_factory = aiosqlite.Row
-            
-            # Apply production pragmas (especially WAL mode for concurrent readers/writers)
-            await cls._db.execute("PRAGMA journal_mode=WAL;")
-            await cls._db.execute("PRAGMA synchronous=NORMAL;")
-            await cls._db.execute("PRAGMA foreign_keys=ON;")
-            await cls._db.execute("PRAGMA cache_size=-65536;")
-            await cls._db.commit()
-            
-            await cls._init_tables(cls._db)
+            async with cls._lock:
+                if cls._db is None:
+                    # Ensure directory exists
+                    config.db_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    cls._db = await aiosqlite.connect(config.db_path)
+                    cls._db.row_factory = aiosqlite.Row
+                    
+                    # Apply production pragmas (especially WAL mode for concurrent readers/writers)
+                    await cls._db.execute("PRAGMA journal_mode=WAL;")
+                    await cls._db.execute("PRAGMA synchronous=NORMAL;")
+                    await cls._db.execute("PRAGMA foreign_keys=ON;")
+                    await cls._db.execute("PRAGMA cache_size=-65536;")
+                    await cls._db.commit()
+                    
+                    await cls._init_tables(cls._db)
             
         return cls._db
 
@@ -102,7 +106,26 @@ class DatabaseManager:
             )
         """)
         
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS monitored_hosts (
+                ip TEXT PRIMARY KEY,
+                is_active INTEGER DEFAULT 1
+            )
+        """)
+        
         await db.commit()
+        
+        # Add is_known column if it doesn't exist (schema migration)
+        try:
+            await db.execute("ALTER TABLE network_devices ADD COLUMN is_known INTEGER DEFAULT 0")
+        except Exception:
+            pass
+            
+        try:
+            await db.execute("ALTER TABLE bt_devices ADD COLUMN is_known INTEGER DEFAULT 0")
+        except Exception:
+            pass
+            
         logger.info("Database tables initialized.")
 
     @classmethod
@@ -174,9 +197,14 @@ class DatabaseManager:
         return [NetworkDevice(mac=r["mac"], ip=r["ip"], vendor=r["vendor"], hostname=r["hostname"]) for r in rows]
 
     @classmethod
-    async def upsert_bt_devices(cls, devices: List[BLEDevice]):
+    async def upsert_bt_devices(cls, devices: List[BLEDevice]) -> Set[str]:
         db = await cls.get_db()
         current_time = time.time()
+        current_macs = {d.address for d in devices}
+        
+        cursor = await db.execute("SELECT address FROM bt_devices")
+        known_macs = {row["address"] for row in await cursor.fetchall()}
+        new_macs = current_macs - known_macs
         
         await db.executemany("""
             INSERT INTO bt_devices (address, name, rssi, last_seen)
@@ -188,6 +216,30 @@ class DatabaseManager:
         """, [(d.address, d.name, d.rssi, current_time) for d in devices])
         
         await db.commit()
+        return new_macs
+
+    @classmethod
+    async def mark_known(cls, mac: str) -> bool:
+        db = await cls.get_db()
+        cur1 = await db.execute("UPDATE network_devices SET is_known = 1 WHERE mac = ?", (mac,))
+        cur2 = await db.execute("UPDATE bt_devices SET is_known = 1 WHERE address = ?", (mac,))
+        await db.commit()
+        return cur1.rowcount > 0 or cur2.rowcount > 0
+        
+    @classmethod
+    async def is_known(cls, mac: str) -> bool:
+        db = await cls.get_db()
+        cur1 = await db.execute("SELECT is_known FROM network_devices WHERE mac = ?", (mac,))
+        row1 = await cur1.fetchone()
+        if row1 and row1["is_known"] == 1:
+            return True
+            
+        cur2 = await db.execute("SELECT is_known FROM bt_devices WHERE address = ?", (mac,))
+        row2 = await cur2.fetchone()
+        if row2 and row2["is_known"] == 1:
+            return True
+            
+        return False
 
     @classmethod
     async def get_hourly_stats(cls, hours: int = 1) -> HourlyStats:
@@ -237,6 +289,26 @@ class DatabaseManager:
         db = await cls.get_db()
         cursor = await db.execute("SELECT COUNT(*) as count FROM oui_mappings")
         return (await cursor.fetchone())["count"]
+
+    @classmethod
+    async def add_monitored_host(cls, ip: str) -> bool:
+        db = await cls.get_db()
+        await db.execute("INSERT OR REPLACE INTO monitored_hosts (ip, is_active) VALUES (?, 1)", (ip,))
+        await db.commit()
+        return True
+
+    @classmethod
+    async def remove_monitored_host(cls, ip: str) -> bool:
+        db = await cls.get_db()
+        cur = await db.execute("DELETE FROM monitored_hosts WHERE ip = ?", (ip,))
+        await db.commit()
+        return cur.rowcount > 0
+
+    @classmethod
+    async def get_monitored_hosts(cls) -> List[str]:
+        db = await cls.get_db()
+        cur = await db.execute("SELECT ip FROM monitored_hosts WHERE is_active = 1")
+        return [r["ip"] for r in await cur.fetchall()]
 
     @classmethod
     async def bulk_insert_oui(cls, mappings: List[Tuple[str, str]]):
