@@ -75,6 +75,10 @@ def get_throttling_status() -> str:
                 return "⚠️ " + ", ".join(issues)
     except FileNotFoundError:
         return "Not available (vcgencmd missing)"
+    except subprocess.CalledProcessError as e:
+        if e.returncode == 255:
+            return "⚠️ Permission denied (needs 'video' group or root)"
+        return f"Error (exit code {e.returncode})"
     except Exception as e:
         return f"Error: {e}"
         
