@@ -1,0 +1,16 @@
+[Unit]
+Description=OverwatcherPI Passive Sniffer
+After=network.target
+
+[Service]
+Type=simple
+User=abhipra
+WorkingDirectory=/opt/OverwatcherPI
+Environment="PATH=/opt/OverwatcherPI/venv/bin:/usr/bin"
+ExecStart=/opt/OverwatcherPI/venv/bin/python bin/sniffer_daemon.py
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

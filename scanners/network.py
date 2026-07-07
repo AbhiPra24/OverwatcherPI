@@ -220,3 +220,36 @@ async def scan() -> List[NetworkDevice]:
         
     logger.info(f"Scan complete. Found {len(final_results)} active devices.")
     return final_results
+
+
+async def scan_ports(ip: str) -> List[dict]:
+    """Single-host fast port scan for drift tracking."""
+    ports = []
+    try:
+        # Fast scan (-F) with service detection (-sV)
+        b_proc = await asyncio.create_subprocess_exec(
+            "nmap", "-sV", "-F", "-oX", "-", ip,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        try:
+            b_stdout, _ = await asyncio.wait_for(b_proc.communicate(), timeout=45.0)
+            if b_proc.returncode == 0:
+                xml_output = b_stdout.decode('utf-8', errors='ignore')
+                root = ET.fromstring(xml_output)
+                for host in root.findall('host'):
+                    for ports_elem in host.findall('ports'):
+                        for port in ports_elem.findall('port'):
+                            state = port.find('state')
+                            if state is not None and state.get('state') == 'open':
+                                port_id = int(port.get('portid'))
+                                service = port.find('service')
+                                service_name = service.get('name') if service is not None else "unknown"
+                                ports.append({"port": port_id, "service": service_name})
+        except asyncio.TimeoutError:
+            b_proc.kill()
+    except Exception as e:
+        logger.debug(f"Port scan failed for {ip}: {e}")
+        
+    return ports

@@ -13,12 +13,16 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr
     telegram_owner_id: int
     scan_subnet: str = "192.168.1.0/24"
+    gateway_ip: str = "192.168.1.1"
+    trusted_dhcp_server: str = ""
     db_path: Path = Field(default=Path("data/netmon.db"))
     log_level: str = "INFO"
     log_file: Path = Field(default=Path("logs/overwatcher.log"))
     hourly_report_enabled: bool = True
     ble_scan_timeout: float = 10.0
     ble_adapter: str = "hci0"
+    ble_proximity_immediate_dbm: int = -50
+    ble_proximity_near_dbm: int = -70
     sweep_interval_minutes: int = 5
     speedtest_interval_hours: int = 3
 

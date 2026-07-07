@@ -93,7 +93,8 @@ async def hourly_report_job(app: Application):
     logger.info("Starting hourly trend report generation...")
     try:
         stats = await DatabaseManager.get_hourly_stats(hours=1)
-        report_text = formatters.format_hourly_report(stats)
+        latency_stats = app.bot_data.get("latency_stats")
+        report_text = formatters.format_hourly_report(stats, latency_stats)
         
         await app.bot.send_message(
             chat_id=config.telegram_owner_id,
@@ -131,14 +132,11 @@ async def ping_sweep_job(app: Application):
     if not hosts:
         return
         
+    from core.ping_utils import ping_host
     for ip in hosts:
-        cmd = ["ping", "-c", "1", "-W", "2", ip]
-        process = await asyncio.create_subprocess_exec(
-            *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
-        )
-        await process.communicate()
+        stats = await ping_host(ip, count=1)
         
-        if process.returncode != 0:
+        if stats["loss_percent"] == 100.0:
             if ip not in _down_hosts:
                 _down_hosts.add(ip)
                 try:
@@ -160,6 +158,20 @@ async def ping_sweep_job(app: Application):
                     )
                 except Exception:
                     pass
+
+async def latency_quality_job(app: Application):
+    """Ping gateway and external host to check quality."""
+    from core.ping_utils import ping_host
+    logger.info("Running latency quality job...")
+    
+    gw_stats = await ping_host(config.gateway_ip, count=4)
+    wan_stats = await ping_host("1.1.1.1", count=4)
+    
+    if "latency_stats" not in app.bot_data:
+        app.bot_data["latency_stats"] = {}
+        
+    app.bot_data["latency_stats"]["gateway"] = gw_stats
+    app.bot_data["latency_stats"]["wan"] = wan_stats
 
 def setup_scheduler(app: Application) -> AsyncIOScheduler:
     """Initialize APScheduler with jobs."""
@@ -212,4 +224,59 @@ def setup_scheduler(app: Application) -> AsyncIOScheduler:
         id="ping_sweep"
     )
     
+    # Schedule Latency Quality Job (every 15 min)
+    scheduler.add_job(
+        latency_quality_job,
+        "interval",
+        minutes=15,
+        args=[app],
+        id="latency_quality"
+    )
+    
+    # Schedule Port Drift Job (Daily at 2 AM)
+    scheduler.add_job(
+        port_drift_job,
+        "cron",
+        hour=2,
+        args=[app],
+        id="port_drift"
+    )
+    
     return scheduler
+
+async def port_drift_job(app: Application):
+    """Daily job to track open ports on known active devices."""
+    logger.info("Starting port drift job...")
+    active_net = await DatabaseManager.get_active_devices()
+    
+    # Basic daily staggering: hash(mac) % 7 == current weekday
+    # This means ~1/7th of devices are scanned per day.
+    today_bucket = datetime.now().weekday()
+    
+    devices_to_scan = [
+        d for d in active_net 
+        if hash(d.mac) % 7 == today_bucket
+    ]
+    
+    if not devices_to_scan:
+        return
+        
+    logger.info(f"Port drift job: Scanning {len(devices_to_scan)} devices in today's bucket.")
+    
+    for d in devices_to_scan:
+        ports = await network.scan_ports(d.ip)
+        new_ports = await DatabaseManager.upsert_device_ports(d.mac, ports)
+        
+        if new_ports:
+            is_known = await DatabaseManager.is_known(d.mac)
+            if is_known:
+                # Alert only if it's a known device that opened a new port
+                ports_str = ", ".join([f"{p['port']} ({p['service']})" for p in new_ports])
+                try:
+                    await app.bot.send_message(
+                        chat_id=config.telegram_owner_id,
+                        text=f"🚨 <b>Port Drift Alert:</b> <code>{d.mac}</code> ({d.hostname or d.vendor}) just opened new port(s): {ports_str} — wasn't open last scan.",
+                        parse_mode=ParseMode.HTML
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send port drift alert for {d.mac}: {e}")

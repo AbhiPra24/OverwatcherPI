@@ -20,6 +20,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/network - Scan local subnet\n"
         "/bluetooth - Scan nearby BLE devices\n"
         "/speedtest - Check internet speed\n"
+        "/traceroute &lt;host&gt; - Run traceroute to host\n"
         "/whitelist &lt;mac&gt; - Mark a device as safe\n"
         "/attacker &lt;ip&gt; - WHOIS OSINT lookup\n"
         "/monitor &lt;ip&gt; - Pin host for ping monitor\n"
@@ -123,3 +124,29 @@ async def unmonitor_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ Stopped monitoring {ip}.")
     else:
         await update.message.reply_text(f"⚠️ {ip} was not being monitored.")
+
+@auth_required
+async def traceroute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Please provide an IP or hostname: /traceroute 1.1.1.1")
+        return
+    host = context.args[0]
+    
+    from bot.formatters import escape
+    msg = await update.message.reply_text(f"🚀 <i>Running traceroute to {escape(host)}...</i>", parse_mode=ParseMode.HTML)
+    
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "traceroute", host,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        
+        output = stdout.decode('utf-8', errors='ignore')[:3800]
+        if not output.strip():
+            output = stderr.decode('utf-8', errors='ignore')[:3800]
+            
+        await msg.edit_text(f"<b>Traceroute to {escape(host)}:</b>\n<pre>{escape(output)}</pre>", parse_mode=ParseMode.HTML)
+    except Exception as e:
+        await msg.edit_text(f"❌ Traceroute failed: {e}")

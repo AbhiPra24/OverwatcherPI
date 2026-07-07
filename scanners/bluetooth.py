@@ -28,6 +28,14 @@ async def scan() -> List[BLEDevice]:
             rssi = adv_data.rssi
             manufacturer_data = adv_data.manufacturer_data or {}
             service_uuids = adv_data.service_uuids or []
+            tx_power = adv_data.tx_power
+            
+            if 0x004C in manufacturer_data:
+                payload = manufacturer_data[0x004C]
+                if len(payload) >= 21 and payload[0] == 0x02 and payload[1] == 0x15:
+                    measured_power = int.from_bytes(payload[-1:], byteorder='big', signed=True)
+                    if tx_power is None:
+                        tx_power = measured_power
             
             if not name:
                 from core.ble_vendors import get_ble_vendor
@@ -46,7 +54,8 @@ async def scan() -> List[BLEDevice]:
                 name=name or "Unknown",
                 rssi=rssi,
                 manufacturer_data_hex=mfr_hex,
-                service_uuids=srv_uuids_str
+                service_uuids=srv_uuids_str,
+                tx_power=tx_power
             ))
             
         logger.info(f"Bluetooth scan complete. Found {len(results)} devices.")

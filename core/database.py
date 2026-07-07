@@ -1,4 +1,5 @@
 import time
+import json
 import logging
 from dataclasses import dataclass
 from typing import Optional, List, Tuple, Set
@@ -29,6 +30,9 @@ class BLEDevice(BaseModel):
     rssi: int
     manufacturer_data_hex: Optional[str] = None
     service_uuids: Optional[str] = None
+    tx_power: Optional[int] = None
+    rssi_history: str = "[]"
+    proximity: str = "Unknown"
 
 
 class HourlyStats(BaseModel):
@@ -124,6 +128,18 @@ class DatabaseManager:
             )
         """)
         
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS device_ports (
+                mac TEXT,
+                port INTEGER,
+                service TEXT,
+                first_seen REAL NOT NULL,
+                last_seen REAL NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                PRIMARY KEY (mac, port)
+            )
+        """)
+        
         await db.commit()
         
         # Add is_known column if it doesn't exist (schema migration)
@@ -143,6 +159,9 @@ class DatabaseManager:
         if "manufacturer_data_hex" not in cols:
             await db.execute("ALTER TABLE bt_devices ADD COLUMN manufacturer_data_hex TEXT")
             await db.execute("ALTER TABLE bt_devices ADD COLUMN service_uuids TEXT")
+        if "tx_power" not in cols:
+            await db.execute("ALTER TABLE bt_devices ADD COLUMN tx_power INTEGER")
+            await db.execute("ALTER TABLE bt_devices ADD COLUMN rssi_history TEXT DEFAULT '[]'")
             
         logger.info("Database tables initialized.")
 
@@ -227,16 +246,36 @@ class DatabaseManager:
         known_macs = {row["address"] for row in await cursor.fetchall()}
         new_macs = current_macs - known_macs
         
+        existing_histories = {}
+        if current_macs:
+            placeholders = ",".join("?" * len(current_macs))
+            cursor = await db.execute(f"SELECT address, rssi_history FROM bt_devices WHERE address IN ({placeholders})", list(current_macs))
+            for row in await cursor.fetchall():
+                try:
+                    existing_histories[row["address"]] = json.loads(row["rssi_history"] or "[]")
+                except json.JSONDecodeError:
+                    existing_histories[row["address"]] = []
+
+        upsert_data = []
+        for d in devices:
+            hist = existing_histories.get(d.address, [])
+            hist.append(d.rssi)
+            hist = hist[-5:]  # Keep last 5 samples
+            d.rssi_history = json.dumps(hist)
+            upsert_data.append((d.address, d.name, d.rssi, current_time, d.manufacturer_data_hex, d.service_uuids, d.tx_power, d.rssi_history))
+
         await db.executemany("""
-            INSERT INTO bt_devices (address, name, rssi, last_seen, manufacturer_data_hex, service_uuids)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO bt_devices (address, name, rssi, last_seen, manufacturer_data_hex, service_uuids, tx_power, rssi_history)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(address) DO UPDATE SET
                 name = CASE WHEN excluded.name != 'Unknown' AND excluded.name != '' THEN excluded.name ELSE bt_devices.name END,
                 rssi = excluded.rssi,
                 last_seen = excluded.last_seen,
                 manufacturer_data_hex = CASE WHEN excluded.manufacturer_data_hex IS NOT NULL THEN excluded.manufacturer_data_hex ELSE bt_devices.manufacturer_data_hex END,
-                service_uuids = CASE WHEN excluded.service_uuids IS NOT NULL THEN excluded.service_uuids ELSE bt_devices.service_uuids END
-        """, [(d.address, d.name, d.rssi, current_time, d.manufacturer_data_hex, d.service_uuids) for d in devices])
+                service_uuids = CASE WHEN excluded.service_uuids IS NOT NULL THEN excluded.service_uuids ELSE bt_devices.service_uuids END,
+                tx_power = excluded.tx_power,
+                rssi_history = excluded.rssi_history
+        """, upsert_data)
         
         await db.commit()
         return new_macs
@@ -356,3 +395,49 @@ class DatabaseManager:
         )
         row = await cursor.fetchone()
         return row["vendor"] if row else None
+
+    @classmethod
+    async def get_device_ports(cls, mac: str) -> List[dict]:
+        db = await cls.get_db()
+        cursor = await db.execute("SELECT port, service, is_active FROM device_ports WHERE mac = ?", (mac,))
+        return [dict(row) for row in await cursor.fetchall()]
+
+    @classmethod
+    async def upsert_device_ports(cls, mac: str, ports: List[dict]) -> List[dict]:
+        """
+        ports: list of dicts with 'port' and 'service'
+        Returns a list of NEW ports that appeared.
+        """
+        db = await cls.get_db()
+        current_time = time.time()
+        
+        cursor = await db.execute("SELECT port, is_active FROM device_ports WHERE mac = ?", (mac,))
+        existing_ports = {row["port"]: row["is_active"] for row in await cursor.fetchall()}
+        
+        new_ports = []
+        upsert_data = []
+        for p in ports:
+            port = p["port"]
+            service = p["service"]
+            upsert_data.append((mac, port, service, current_time, current_time))
+            if port not in existing_ports or existing_ports[port] == 0:
+                new_ports.append(p)
+                
+        if upsert_data:
+            await db.executemany("""
+                INSERT INTO device_ports (mac, port, service, first_seen, last_seen, is_active)
+                VALUES (?, ?, ?, ?, ?, 1)
+                ON CONFLICT(mac, port) DO UPDATE SET
+                    service = excluded.service,
+                    last_seen = excluded.last_seen,
+                    is_active = 1
+            """, upsert_data)
+            
+        current_port_nums = {p["port"] for p in ports}
+        gone_ports = [p for p in existing_ports if existing_ports[p] == 1 and p not in current_port_nums]
+        if gone_ports:
+            placeholders = ",".join("?" * len(gone_ports))
+            await db.execute(f"UPDATE device_ports SET is_active = 0 WHERE mac = ? AND port IN ({placeholders})", [mac] + gone_ports)
+            
+        await db.commit()
+        return new_ports

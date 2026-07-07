@@ -66,16 +66,29 @@ def format_bluetooth(devices: List[BLEDevice]) -> str:
         "<code>─────────────────────────</code>"
     ]
     
+    import json
+    from core.ble_proximity import smooth_rssi, estimate_proximity
+    
     for dev in sorted(devices, key=lambda d: d.rssi, reverse=True):
         bars = "🟩" * (min(100, max(0, dev.rssi + 100)) // 20 + 1)
+        
+        hist = []
+        try:
+            hist = json.loads(dev.rssi_history)
+        except Exception:
+            hist = [dev.rssi]
+            
+        smoothed = smooth_rssi(hist)
+        prox_tier = estimate_proximity(smoothed, dev.tx_power)
+        
         lines.append(f"<b>{escape(dev.name)}</b> (<code>{escape(dev.address)}</code>)")
-        lines.append(f"   RSSI: {dev.rssi} dBm {bars}")
+        lines.append(f"   RSSI: {dev.rssi} dBm {bars} — [{prox_tier}]")
         lines.append("")
         
     return "\n".join(lines).strip()
 
 
-def format_hourly_report(stats: HourlyStats) -> str:
+def format_hourly_report(stats: HourlyStats, latency_stats: dict = None) -> str:
     lines = [
         "📊 <b>Hourly Trend Report</b>",
         "<code>─────────────────────────</code>",
@@ -83,6 +96,15 @@ def format_hourly_report(stats: HourlyStats) -> str:
         f"🔷 <b>Active BLE Devices:</b> {stats.ble_device_count}",
         ""
     ]
+    
+    if latency_stats:
+        gw = latency_stats.get("gateway", {})
+        wan = latency_stats.get("wan", {})
+        if gw and wan:
+            lines.append("📶 <b>Network Quality:</b>")
+            lines.append(f"  • Gateway: {gw.get('loss_percent', 100):.1f}% loss, {gw.get('jitter_ms', 0):.2f}ms jitter")
+            lines.append(f"  • WAN: {wan.get('loss_percent', 100):.1f}% loss, {wan.get('jitter_ms', 0):.2f}ms jitter")
+            lines.append("")
     
     if stats.unwhitelisted_count > 0:
         lines.append(f"⚠️ <b>{stats.unwhitelisted_count} device(s) still unwhitelisted!</b>")

@@ -51,6 +51,7 @@ def setup_application(post_init_hook=None):
     app.add_handler(CommandHandler("whitelist", handlers.whitelist_handler))
     app.add_handler(CommandHandler("monitor", handlers.monitor_handler))
     app.add_handler(CommandHandler("unmonitor", handlers.unmonitor_handler))
+    app.add_handler(CommandHandler("traceroute", handlers.traceroute_handler))
     
     app.add_error_handler(global_error_handler)
     
