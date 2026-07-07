@@ -114,3 +114,4 @@ The recommended deployment path is `/opt/OverwatcherPI/`.
 
 ## Known Limitations
 - **BLE Tracking:** iOS/Android BLE addresses rotate roughly every 15 minutes by design. Devices never paired/bonded with this Pi cannot be reliably tracked or identified long-term — that's BLE privacy working as intended, not a bug.
+- **Passive Sniffer:** On a switched (non-hub) network, the passive sniffer can only reliably see broadcast ARP/DHCP traffic and unicast traffic addressed directly to/from the Pi itself. Additionally, if the Pi is WiFi-only, running the passive sniffer continuously on the WiFi interface can affect stability on some chipsets (like the Pi's onboard Broadcom WiFi). To mitigate this, point `SNIFFER_INTERFACE` at a wired interface if one exists, or leave it blank to disable the feature entirely.

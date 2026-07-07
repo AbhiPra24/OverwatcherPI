@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr
     telegram_owner_id: int
     scan_subnet: str = "192.168.1.0/24"
+    max_concurrent_scans: int = 2
     gateway_ip: str = "192.168.1.1"
+    sniffer_interface: str = ""
     trusted_dhcp_server: str = ""
     db_path: Path = Field(default=Path("data/netmon.db"))
     log_level: str = "INFO"

@@ -266,6 +266,15 @@ def setup_scheduler(app: Application) -> AsyncIOScheduler:
         id="port_drift"
     )
     
+    # Schedule Identification Enrichment (Every 2 hours)
+    scheduler.add_job(
+        identification_enrichment_job,
+        "interval",
+        hours=2,
+        args=[app],
+        id="identification_enrichment"
+    )
+    
     return scheduler
 
 async def port_drift_job(app: Application):
@@ -310,3 +319,18 @@ async def port_drift_job(app: Application):
                     )
                 except Exception as e:
                     logger.error(f"Failed to send port drift alert for {d.mac}: {e}")
+
+async def identification_enrichment_job(app: Application):
+    """Background job to run deep banner grabs on unknown devices with backoff."""
+    logger.info("Starting identification enrichment job...")
+    devices = await DatabaseManager.get_devices_needing_banner_grab()
+    
+    if not devices:
+        return
+        
+    for d in devices:
+        hostname = await network.grab_banner(d.ip)
+        resolved = bool(hostname)
+        await DatabaseManager.record_banner_grab_attempt(d.mac, resolved, hostname)
+        if resolved:
+            logger.info(f"Resolved unknown device {d.mac} to {hostname}")

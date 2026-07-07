@@ -99,13 +99,15 @@ def _get_mdns_names() -> dict:
 
 async def _resolve_netbios(ip: str) -> str:
     """Resolve NetBIOS name using nmblookup."""
+    from core import scan_limits
     try:
-        proc = await asyncio.create_subprocess_exec(
-            "nmblookup", "-A", ip,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, _ = await proc.communicate()
+        async with scan_limits.NMAP_SEMAPHORE:
+            proc = await asyncio.create_subprocess_exec(
+                "nmblookup", "-A", ip,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await proc.communicate()
         if proc.returncode == 0:
             lines = stdout.decode('utf-8', errors='ignore').splitlines()
             for line in lines:
@@ -176,35 +178,7 @@ async def scan() -> List[NetworkDevice]:
 
     results = await asyncio.gather(*(process_device(raw) for raw in raw_devices))
 
-    async def grab_banner(res):
-        if res["vendor"] == "Unknown" and not res["hostname"]:
-            try:
-                ip = res["ip"]
-                b_proc = await asyncio.create_subprocess_exec(
-                    "nmap", "-sV", "--script", "http-title,snmp-info", ip,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                
-                try:
-                    b_stdout, _ = await asyncio.wait_for(b_proc.communicate(), timeout=15.0)
-                    if b_proc.returncode == 0:
-                        out = b_stdout.decode('utf-8', errors='ignore')
-                        for line in out.splitlines():
-                            if "http-title:" in line:
-                                title = line.split("http-title:", 1)[1].strip()
-                                res["hostname"] = title
-                                break
-                            if "snmp-info:" in line:
-                                info = line.split("snmp-info:", 1)[1].strip()
-                                res["hostname"] = info
-                                break
-                except asyncio.TimeoutError:
-                    b_proc.kill()
-            except Exception as e:
-                logger.debug(f"Banner grab failed for {res['ip']}: {e}")
-
-    await asyncio.gather(*(grab_banner(res) for res in results))
+    # Banner grabbing is now handled by a separate background job
 
     final_results = []
     for res in results:
@@ -224,15 +198,17 @@ async def scan() -> List[NetworkDevice]:
 
 async def scan_ports(ip: str) -> List[dict]:
     """Single-host fast port scan for drift tracking."""
+    from core import scan_limits
     ports = []
     try:
         # Fast scan (-F) with service detection (-sV)
-        b_proc = await asyncio.create_subprocess_exec(
-            "nmap", "-sV", "-F", "-oX", "-", ip,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        
+        async with scan_limits.NMAP_SEMAPHORE:
+            b_proc = await asyncio.create_subprocess_exec(
+                "nmap", "-sV", "-F", "-oX", "-", ip,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
         try:
             b_stdout, _ = await asyncio.wait_for(b_proc.communicate(), timeout=45.0)
             if b_proc.returncode == 0:
@@ -253,3 +229,29 @@ async def scan_ports(ip: str) -> List[dict]:
         logger.debug(f"Port scan failed for {ip}: {e}")
         
     return ports
+
+async def grab_banner(ip: str) -> str:
+    """Standalone banner grab using scoped Nmap scan."""
+    from core import scan_limits
+    try:
+        async with scan_limits.NMAP_SEMAPHORE:
+            b_proc = await asyncio.create_subprocess_exec(
+                "nmap", "-sU", "-sV", "-p", "T:80,443,8080,8443,8000,U:161", "--script", "http-title,snmp-info", ip,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            try:
+                b_stdout, _ = await asyncio.wait_for(b_proc.communicate(), timeout=15.0)
+                if b_proc.returncode == 0:
+                    out = b_stdout.decode('utf-8', errors='ignore')
+                    for line in out.splitlines():
+                        if "http-title:" in line:
+                            return line.split("http-title:", 1)[1].strip()
+                        if "snmp-info:" in line:
+                            return line.split("snmp-info:", 1)[1].strip()
+            except asyncio.TimeoutError:
+                b_proc.kill()
+    except Exception as e:
+        logger.debug(f"Banner grab failed for {ip}: {e}")
+    return ""

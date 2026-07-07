@@ -162,6 +162,9 @@ class DatabaseManager:
             await db.execute("ALTER TABLE network_devices ADD COLUMN raw_mdns_name TEXT")
             await db.execute("ALTER TABLE network_devices ADD COLUMN raw_ssdp_server TEXT")
             await db.execute("ALTER TABLE network_devices ADD COLUMN raw_netbios_name TEXT")
+        if "banner_grab_attempted_at" not in cols:
+            await db.execute("ALTER TABLE network_devices ADD COLUMN banner_grab_attempted_at REAL")
+            await db.execute("ALTER TABLE network_devices ADD COLUMN banner_grab_attempts INTEGER DEFAULT 0")
             
         cursor = await db.execute("PRAGMA table_info(bt_devices)")
         cols = [row["name"] for row in await cursor.fetchall()]
@@ -461,4 +464,57 @@ class DatabaseManager:
             "INSERT INTO events (timestamp, category, severity, message, related_id) VALUES (?, ?, ?, ?, ?)",
             (time.time(), category, severity, message, related_id)
         )
+        await db.commit()
+
+    @classmethod
+    async def get_devices_needing_banner_grab(cls) -> List[NetworkDevice]:
+        db = await cls.get_db()
+        current_time = time.time()
+        
+        query = """
+            SELECT mac, ip, vendor, hostname, banner_grab_attempted_at, banner_grab_attempts
+            FROM network_devices 
+            WHERE is_active = 1 
+            AND vendor = 'Unknown' 
+            AND hostname = ''
+        """
+        cursor = await db.execute(query)
+        rows = await cursor.fetchall()
+        
+        devices = []
+        for r in rows:
+            attempts = r["banner_grab_attempts"] or 0
+            last_attempt = r["banner_grab_attempted_at"]
+            
+            if last_attempt is None:
+                devices.append(NetworkDevice(mac=r["mac"], ip=r["ip"], vendor=r["vendor"], hostname=r["hostname"]))
+                continue
+                
+            cooldown_hours = min(168, 2 ** attempts)
+            if current_time - last_attempt >= cooldown_hours * 3600:
+                devices.append(NetworkDevice(mac=r["mac"], ip=r["ip"], vendor=r["vendor"], hostname=r["hostname"]))
+                
+        return devices
+
+    @classmethod
+    async def record_banner_grab_attempt(cls, mac: str, resolved: bool, hostname: str = ""):
+        db = await cls.get_db()
+        current_time = time.time()
+        
+        if resolved and hostname:
+            await db.execute("""
+                UPDATE network_devices 
+                SET banner_grab_attempted_at = ?, 
+                    banner_grab_attempts = banner_grab_attempts + 1,
+                    hostname = ?
+                WHERE mac = ?
+            """, (current_time, hostname, mac))
+        else:
+            await db.execute("""
+                UPDATE network_devices 
+                SET banner_grab_attempted_at = ?, 
+                    banner_grab_attempts = banner_grab_attempts + 1
+                WHERE mac = ?
+            """, (current_time, mac))
+            
         await db.commit()
