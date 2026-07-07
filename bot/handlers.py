@@ -1,8 +1,9 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 import asyncio
 import speedtest
+import re
 
 from bot.middleware import auth_required
 from bot import formatters
@@ -10,6 +11,7 @@ from utils import metrics
 from utils.osint import get_ip_info
 from scanners import network, bluetooth
 from core.database import DatabaseManager
+from core.scan_limits import SCAN_LOCK
 
 @auth_required
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -37,26 +39,51 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @auth_required
 async def network_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if SCAN_LOCK.locked():
+        await update.message.reply_text("⏳ A scan is already running, try again shortly.")
+        return
+        
     msg = await update.message.reply_text("🔍 <i>Scanning local network...</i>", parse_mode=ParseMode.HTML)
     
     try:
-        devices = await network.scan()
+        async with SCAN_LOCK:
+            devices = await network.scan()
         new_macs, _ = await DatabaseManager.upsert_network_devices(devices)
         
-        await msg.edit_text(formatters.format_network(devices, new_macs), parse_mode=ParseMode.HTML)
+        text = formatters.format_network(devices, new_macs)
+        text = formatters.truncate_for_telegram(text)
+        
+        keyboard = []
+        for dev in devices:
+            if dev.mac in new_macs or not await DatabaseManager.is_known(dev.mac):
+                keyboard.append([
+                    InlineKeyboardButton(f"Whitelist {dev.ip}", callback_data=f"whitelist:{dev.mac}"),
+                    InlineKeyboardButton(f"OSINT {dev.ip}", callback_data=f"attacker:{dev.ip}")
+                ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard[:50]) if keyboard else None
+        await msg.edit_text(text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
     except Exception as e:
         await msg.edit_text(f"❌ <b>Scan failed:</b> {str(e)}", parse_mode=ParseMode.HTML)
 
 
 @auth_required
 async def bluetooth_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if SCAN_LOCK.locked():
+        await update.message.reply_text("⏳ A scan is already running, try again shortly.")
+        return
+        
     msg = await update.message.reply_text("🔷 <i>Scanning for Bluetooth LE devices (10s)...</i>", parse_mode=ParseMode.HTML)
     
     try:
-        devices = await bluetooth.scan()
+        async with SCAN_LOCK:
+            devices = await bluetooth.scan()
         await DatabaseManager.upsert_bt_devices(devices)
         
-        await msg.edit_text(formatters.format_bluetooth(devices), parse_mode=ParseMode.HTML)
+        text = formatters.format_bluetooth(devices)
+        text = formatters.truncate_for_telegram(text)
+        
+        await msg.edit_text(text, parse_mode=ParseMode.HTML)
     except Exception as e:
         await msg.edit_text(f"❌ <b>Scan failed:</b> {str(e)}", parse_mode=ParseMode.HTML)
 
@@ -88,6 +115,10 @@ async def whitelist_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Please provide a MAC address: /whitelist 00:11:22:33:44:55")
         return
     mac = context.args[0].upper()
+    if not re.match(r"^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$", mac):
+        await update.message.reply_text("❌ That doesn't look like a valid MAC address.")
+        return
+        
     success = await DatabaseManager.mark_known(mac)
     if success:
         await update.message.reply_text(f"✅ Whitelisted MAC: {mac}")
@@ -100,9 +131,13 @@ async def attacker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Please provide an IP: /attacker 8.8.8.8")
         return
     ip = context.args[0]
+    if not re.match(r"^[a-zA-Z0-9.-]+$", ip):
+        await update.message.reply_text("❌ That doesn't look like a valid IP address.")
+        return
+        
     await update.message.reply_text(f"🔍 <i>Looking up OSINT for {ip}...</i>", parse_mode=ParseMode.HTML)
     info = await get_ip_info(ip)
-    await update.message.reply_text(f"🌐 <b>OSINT for <code>{ip}</code>:</b>\n<pre>{info}</pre>", parse_mode=ParseMode.HTML)
+    await update.message.reply_text(f"🌐 <b>OSINT for <code>{ip}</code>:</b>\n<pre>{formatters.escape(info)}</pre>", parse_mode=ParseMode.HTML)
 
 @auth_required
 async def monitor_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -110,6 +145,10 @@ async def monitor_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Please provide an IP or hostname: /monitor 192.168.1.1")
         return
     ip = context.args[0]
+    if not re.match(r"^[a-zA-Z0-9.-]+$", ip):
+        await update.message.reply_text("❌ That doesn't look like a valid IP or hostname.")
+        return
+        
     await DatabaseManager.add_monitored_host(ip)
     await update.message.reply_text(f"✅ Now monitoring {ip} for downtime.")
 
@@ -119,6 +158,10 @@ async def unmonitor_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Please provide an IP or hostname: /unmonitor 192.168.1.1")
         return
     ip = context.args[0]
+    if not re.match(r"^[a-zA-Z0-9.-]+$", ip):
+        await update.message.reply_text("❌ That doesn't look like a valid IP or hostname.")
+        return
+        
     success = await DatabaseManager.remove_monitored_host(ip)
     if success:
         await update.message.reply_text(f"✅ Stopped monitoring {ip}.")
@@ -131,9 +174,11 @@ async def traceroute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("Please provide an IP or hostname: /traceroute 1.1.1.1")
         return
     host = context.args[0]
+    if not re.match(r"^[a-zA-Z0-9.-]+$", host):
+        await update.message.reply_text("❌ That doesn't look like a valid IP or hostname.")
+        return
     
-    from bot.formatters import escape
-    msg = await update.message.reply_text(f"🚀 <i>Running traceroute to {escape(host)}...</i>", parse_mode=ParseMode.HTML)
+    msg = await update.message.reply_text(f"🚀 <i>Running traceroute to {formatters.escape(host)}...</i>", parse_mode=ParseMode.HTML)
     
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -147,6 +192,94 @@ async def traceroute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if not output.strip():
             output = stderr.decode('utf-8', errors='ignore')[:3800]
             
-        await msg.edit_text(f"<b>Traceroute to {escape(host)}:</b>\n<pre>{escape(output)}</pre>", parse_mode=ParseMode.HTML)
+        await msg.edit_text(f"<b>Traceroute to {formatters.escape(host)}:</b>\n<pre>{formatters.escape(output)}</pre>", parse_mode=ParseMode.HTML)
     except Exception as e:
         await msg.edit_text(f"❌ Traceroute failed: {e}")
+
+@auth_required
+async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data
+    if data.startswith("whitelist:"):
+        mac = data.split(":", 1)[1]
+        success = await DatabaseManager.mark_known(mac)
+        if success:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"✅ Whitelisted MAC: {mac}")
+        else:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=f"⚠️ MAC {mac} not found in database.")
+            
+    elif data.startswith("attacker:"):
+        ip = data.split(":", 1)[1]
+        msg = await context.bot.send_message(chat_id=update.effective_chat.id, text=f"🔍 <i>Looking up OSINT for {ip}...</i>", parse_mode=ParseMode.HTML)
+        info = await get_ip_info(ip)
+        await msg.edit_text(f"🌐 <b>OSINT for <code>{ip}</code>:</b>\n<pre>{formatters.escape(info)}</pre>", parse_mode=ParseMode.HTML)
+
+import tempfile
+import os
+import csv
+
+@auth_required
+async def export_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = await update.message.reply_text("📦 <i>Generating export...</i>", parse_mode=ParseMode.HTML)
+    try:
+        db = await DatabaseManager.get_db()
+        cursor = await db.execute("SELECT * FROM network_devices")
+        rows = await cursor.fetchall()
+        
+        fd, path = tempfile.mkstemp(suffix=".csv")
+        with os.fdopen(fd, 'w', newline='', encoding='utf-8') as f:
+            if rows:
+                writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow(dict(row))
+        
+        await update.message.reply_document(document=open(path, 'rb'), filename="network_devices.csv")
+        os.remove(path)
+        await msg.delete()
+    except Exception as e:
+        await msg.edit_text(f"❌ Export failed: {e}")
+
+@auth_required
+async def logs_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /logs <service> [lines]\nValid services: overwatcher, overwatcher-sniffer, overwatcher-dashboard")
+        return
+        
+    service = context.args[0]
+    allowed = ["overwatcher", "overwatcher-sniffer", "overwatcher-dashboard"]
+    if service not in allowed:
+        await update.message.reply_text(f"❌ Invalid service. Allowed: {', '.join(allowed)}")
+        return
+        
+    lines = "50"
+    if len(context.args) > 1 and context.args[1].isdigit():
+        lines = context.args[1]
+        
+    msg = await update.message.reply_text(f"📋 <i>Fetching logs for {service}...</i>", parse_mode=ParseMode.HTML)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "journalctl", "-u", service, "-n", lines, "--no-pager",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await proc.communicate()
+        
+        output = stdout.decode('utf-8', errors='ignore')
+        if not output.strip():
+            await msg.edit_text(f"<i>No logs found for {service}.</i>", parse_mode=ParseMode.HTML)
+            return
+            
+        if len(output) > 3800:
+            fd, path = tempfile.mkstemp(suffix=".log")
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                f.write(output)
+            await update.message.reply_document(document=open(path, 'rb'), filename=f"{service}.log")
+            os.remove(path)
+            await msg.delete()
+        else:
+            await msg.edit_text(f"<b>Logs for {service}</b>:\n<pre>{formatters.escape(output)}</pre>", parse_mode=ParseMode.HTML)
+    except Exception as e:
+        await msg.edit_text(f"❌ Failed to fetch logs: {e}")

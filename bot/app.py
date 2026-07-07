@@ -23,6 +23,21 @@ def setup_application(post_init_hook=None):
     async def internal_post_init(app):
         if post_init_hook:
             await post_init_hook(app)
+            
+        from telegram import BotCommand
+        await app.bot.set_my_commands([
+            BotCommand("status", "Hardware diagnostics"),
+            BotCommand("network", "Scan local subnet"),
+            BotCommand("bluetooth", "Scan nearby BLE devices"),
+            BotCommand("speedtest", "Check internet speed"),
+            BotCommand("traceroute", "Run traceroute to host"),
+            BotCommand("whitelist", "Mark a device as safe"),
+            BotCommand("attacker", "WHOIS OSINT lookup"),
+            BotCommand("monitor", "Pin host for ping monitor"),
+            BotCommand("unmonitor", "Remove host from ping monitor"),
+            BotCommand("export", "Export database to CSV"),
+            BotCommand("logs", "Fetch systemd logs")
+        ])
         
         import asyncio
         from core.ssh_watcher import ssh_log_watcher
@@ -52,6 +67,11 @@ def setup_application(post_init_hook=None):
     app.add_handler(CommandHandler("monitor", handlers.monitor_handler))
     app.add_handler(CommandHandler("unmonitor", handlers.unmonitor_handler))
     app.add_handler(CommandHandler("traceroute", handlers.traceroute_handler))
+    app.add_handler(CommandHandler("export", handlers.export_handler))
+    app.add_handler(CommandHandler("logs", handlers.logs_handler))
+    
+    from telegram.ext import CallbackQueryHandler
+    app.add_handler(CallbackQueryHandler(handlers.callback_query_handler))
     
     app.add_error_handler(global_error_handler)
     

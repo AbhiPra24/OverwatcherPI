@@ -9,6 +9,7 @@ from core.database import DatabaseManager
 from core import oui
 from scanners import network, bluetooth
 from bot import formatters
+from bot.broadcaster import broadcast_message
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -18,15 +19,21 @@ async def fast_sweep_job(app: Application):
     """Background job to scan network/BLE, compute diffs, and notify owner immediately."""
     logger.info("Starting fast background sweep...")
     
+    from core.scan_limits import SCAN_LOCK
+    if SCAN_LOCK.locked():
+        logger.warning("Fast sweep skipped: scan already running.")
+        return
+        
     # 1. Run scans with crash safety
     try:
-        net_devices = await network.scan()
-        bt_devices = await bluetooth.scan()
+        async with SCAN_LOCK:
+            net_devices = await network.scan()
+            bt_devices = await bluetooth.scan()
     except Exception as e:
         logger.error(f"Sweep failed: {e}")
         try:
-            await app.bot.send_message(
-                chat_id=config.telegram_owner_id,
+            await broadcast_message(
+                app,
                 text=f"⚠️ <b>Network Sweep Failed:</b> {e}",
                 parse_mode=ParseMode.HTML
             )
@@ -65,8 +72,8 @@ async def fast_sweep_job(app: Application):
                 
                 ports_str = ", ".join(open_ports) if open_ports else "None found"
                 try:
-                    await app.bot.send_message(
-                        chat_id=config.telegram_owner_id,
+                    await broadcast_message(
+                        app,
                         text=f"🚨 <b>Unknown device joined the network:</b> {d.vendor} (MAC: <code>{d.mac}</code>)\n"
                              f"📡 IP: {d.ip}\n"
                              f"🔓 Open Ports: {ports_str}",
@@ -98,13 +105,15 @@ async def fast_sweep_job(app: Application):
                     should_alert = await DatabaseManager.should_alert_ble_vendor(name, config.ble_alert_cooldown_hours)
                     
                 if should_alert:
-                    await app.bot.send_message(
-                        chat_id=config.telegram_owner_id,
+                    await broadcast_message(
+                        app,
                         text=f"🚨 <b>Unknown Bluetooth device detected:</b> {name} (MAC: <code>{mac}</code>)",
                         parse_mode=ParseMode.HTML
                     )
             except Exception as e:
                 logger.error(f"Failed to process BLE alert: {e}")
+                
+    await DatabaseManager.record_scan_heartbeat("fast_sweep")
     
 async def hourly_report_job(app: Application):
     """Background job to send the aggregated hourly trend report."""
@@ -117,12 +126,14 @@ async def hourly_report_job(app: Application):
         latency_stats = app.bot_data.get("latency_stats")
         report_text = formatters.format_hourly_report(stats, latency_stats)
         
-        await app.bot.send_message(
-            chat_id=config.telegram_owner_id,
+        await broadcast_message(
+            app,
             text=report_text,
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
+            disable_notification=True
         )
         logger.info("Hourly report sent successfully.")
+        await DatabaseManager.record_scan_heartbeat("hourly_report")
     except Exception as e:
         logger.error(f"Failed to send hourly report: {e}")
 
@@ -138,11 +149,12 @@ async def scheduled_speedtest_job(app: Application):
     try:
         d_mbps = await asyncio.to_thread(run_st)
         if d_mbps < 50.0:  # arbitrary threshold
-            await app.bot.send_message(
-                chat_id=config.telegram_owner_id,
+            await broadcast_message(
+                app,
                 text=f"⚠️ <b>Internet Speed Alert:</b>\nDownload speed dropped to {d_mbps:.2f} Mbps",
                 parse_mode=ParseMode.HTML
             )
+        await DatabaseManager.record_scan_heartbeat("speedtest")
     except Exception as e:
         logger.error(f"Scheduled speedtest failed: {e}")
 
@@ -161,8 +173,8 @@ async def ping_sweep_job(app: Application):
             if ip not in _down_hosts:
                 _down_hosts.add(ip)
                 try:
-                    await app.bot.send_message(
-                        chat_id=config.telegram_owner_id,
+                    await broadcast_message(
+                        app,
                         text=f"⚠️ <b>Critical Host Offline:</b> <code>{ip}</code> is not responding to ping!",
                         parse_mode=ParseMode.HTML
                     )
@@ -178,8 +190,8 @@ async def ping_sweep_job(app: Application):
             if ip in _down_hosts:
                 _down_hosts.remove(ip)
                 try:
-                    await app.bot.send_message(
-                        chat_id=config.telegram_owner_id,
+                    await broadcast_message(
+                        app,
                         text=f"✅ <b>Host Recovered:</b> <code>{ip}</code> is back online.",
                         parse_mode=ParseMode.HTML
                     )
@@ -191,6 +203,7 @@ async def ping_sweep_job(app: Application):
                     )
                 except Exception:
                     pass
+    await DatabaseManager.record_scan_heartbeat("ping_sweep")
 
 async def latency_quality_job(app: Application):
     """Ping gateway and external host to check quality."""
@@ -209,6 +222,90 @@ async def latency_quality_job(app: Application):
     # Persist to database for dashboard trends
     await DatabaseManager.log_latency_sample("gateway", gw_stats.get("loss_percent", 100.0), gw_stats.get("jitter_ms", 0.0))
     await DatabaseManager.log_latency_sample("wan", wan_stats.get("loss_percent", 100.0), wan_stats.get("jitter_ms", 0.0))
+    await DatabaseManager.record_scan_heartbeat("latency_quality")
+
+_down_services = set()
+async def service_watchdog_job(app: Application):
+    from utils.metrics import get_service_status
+    from bot.broadcaster import broadcast_message
+    from telegram.constants import ParseMode
+    import asyncio
+    
+    for svc in config.watched_services:
+        status = await asyncio.to_thread(get_service_status, svc)
+        is_active = status == "active"
+        
+        if not is_active:
+            if svc not in _down_services:
+                _down_services.add(svc)
+                try:
+                    await broadcast_message(
+                        app,
+                        text=f"🚨 <b>Service Down:</b> <code>{svc}</code> is now <b>{status}</b>!",
+                        parse_mode=ParseMode.HTML
+                    )
+                except Exception:
+                    pass
+        else:
+            if svc in _down_services:
+                _down_services.remove(svc)
+                try:
+                    await broadcast_message(
+                        app,
+                        text=f"✅ <b>Service Recovered:</b> <code>{svc}</code> is back online.",
+                        parse_mode=ParseMode.HTML
+                    )
+                except Exception:
+                    pass
+
+async def resource_health_job(app: Application):
+    """Proactively monitor resource usage."""
+    from utils.metrics import get_system_status
+    from bot.broadcaster import broadcast_message
+    from telegram.constants import ParseMode
+    
+    status = get_system_status()
+    alerts = []
+    
+    # Check Temp
+    if status.temp_celsius >= config.dashboard_temp_crit_c:
+        if await DatabaseManager.should_alert_resource("temp_crit", config.resource_alert_cooldown_hours):
+            alerts.append(f"🚨 <b>CRITICAL Temp:</b> {status.temp_celsius:.1f}°C")
+    elif status.temp_celsius >= config.dashboard_temp_warn_c:
+        if await DatabaseManager.should_alert_resource("temp_warn", config.resource_alert_cooldown_hours):
+            alerts.append(f"⚠️ <b>Warning Temp:</b> {status.temp_celsius:.1f}°C")
+            
+    # Check CPU
+    max_cpu = max(status.cpu_per_core) if status.cpu_per_core else 0
+    if max_cpu >= config.cpu_warn_percent:
+        if await DatabaseManager.should_alert_resource("cpu_warn", config.resource_alert_cooldown_hours):
+            alerts.append(f"⚠️ <b>High CPU Usage:</b> {max_cpu:.1f}%")
+            
+    # Check RAM
+    ram_pct = (status.ram_used_mb / status.ram_total_mb * 100) if status.ram_total_mb else 0
+    if ram_pct >= config.ram_warn_percent:
+        if await DatabaseManager.should_alert_resource("ram_warn", config.resource_alert_cooldown_hours):
+            alerts.append(f"⚠️ <b>High RAM Usage:</b> {ram_pct:.1f}%")
+            
+    # Check Disk
+    if status.disk_percent >= config.disk_warn_percent:
+        if await DatabaseManager.should_alert_resource("disk_warn", config.resource_alert_cooldown_hours):
+            alerts.append(f"⚠️ <b>High Disk Usage:</b> {status.disk_percent:.1f}%")
+            
+    # Check Throttling
+    if "⚠️" in status.throttling_status and "occurred" in status.throttling_status.lower():
+        if await DatabaseManager.should_alert_resource("throttling_occurred", config.resource_alert_cooldown_hours):
+            alerts.append(f"⚠️ <b>System Throttling Occurred:</b> {status.throttling_status}")
+    elif "⚠️" in status.throttling_status:
+        if await DatabaseManager.should_alert_resource("throttling_active", config.resource_alert_cooldown_hours):
+            alerts.append(f"🚨 <b>Active System Throttling:</b> {status.throttling_status}")
+
+    if alerts:
+        msg = "🔧 <b>System Resource Alert</b>\n" + "\n".join(alerts)
+        try:
+            await broadcast_message(app, text=msg, parse_mode=ParseMode.HTML)
+        except Exception:
+            pass
 
 def setup_scheduler(app: Application) -> AsyncIOScheduler:
     """Initialize APScheduler with jobs."""
@@ -297,6 +394,24 @@ def setup_scheduler(app: Application) -> AsyncIOScheduler:
         id="db_retention"
     )
     
+    # Schedule Service Watchdog
+    scheduler.add_job(
+        service_watchdog_job,
+        "interval",
+        minutes=5,
+        args=[app],
+        id="service_watchdog"
+    )
+    
+    # Schedule Resource Health Job
+    scheduler.add_job(
+        resource_health_job,
+        "interval",
+        minutes=5,
+        args=[app],
+        id="resource_health"
+    )
+    
     return scheduler
 
 async def port_drift_job(app: Application):
@@ -328,8 +443,8 @@ async def port_drift_job(app: Application):
                 # Alert only if it's a known device that opened a new port
                 ports_str = ", ".join([f"{p['port']} ({p['service']})" for p in new_ports])
                 try:
-                    await app.bot.send_message(
-                        chat_id=config.telegram_owner_id,
+                    await broadcast_message(
+                        app,
                         text=f"🚨 <b>Port Drift Alert:</b> <code>{d.mac}</code> ({d.hostname or d.vendor}) just opened new port(s): {ports_str} — wasn't open last scan.",
                         parse_mode=ParseMode.HTML
                     )
@@ -341,6 +456,8 @@ async def port_drift_job(app: Application):
                     )
                 except Exception as e:
                     logger.error(f"Failed to send port drift alert for {d.mac}: {e}")
+                    
+    await DatabaseManager.record_scan_heartbeat("port_drift")
 
 async def identification_enrichment_job(app: Application):
     """Background job to run deep banner grabs on unknown devices with backoff."""
@@ -377,6 +494,8 @@ async def identification_enrichment_job(app: Application):
         await DatabaseManager.record_banner_grab_attempt(d.mac, resolved, hostname)
         if resolved:
             logger.info(f"Resolved unknown device {d.mac} to {hostname}")
+            
+    await DatabaseManager.record_scan_heartbeat("identification_enrichment")
 
 async def db_retention_job(app: Application):
     """Daily job to prune old rows from unbounded tables (scan_history, events)."""
@@ -392,5 +511,6 @@ async def db_retention_job(app: Application):
         await db.execute("DELETE FROM events WHERE timestamp < ?", (cutoff,))
         await db.commit()
         logger.info("DB retention job completed.")
+        await DatabaseManager.record_scan_heartbeat("db_retention")
     except Exception as e:
         logger.error(f"DB retention job failed: {e}")

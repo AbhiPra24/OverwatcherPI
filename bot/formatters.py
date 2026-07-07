@@ -8,24 +8,58 @@ def escape(text: str) -> str:
     """HTML escape to be safe for Telegram HTML parse mode."""
     return html.escape(str(text))
 
+def truncate_for_telegram(text: str, limit: int = 4000) -> str:
+    if len(text) <= limit:
+        return text
+    suffix = "\n\n<i>...and more, see the dashboard</i>"
+    return text[:limit - len(suffix)] + suffix
+
 
 def format_status(status: SystemStatus) -> str:
     lines = [
         "🖥 <b>System Status (Raspberry Pi)</b>",
         "<code>─────────────────────────</code>",
-        f"🌡 <b>Temperature:</b> {status.temp_celsius:.1f} °C",
+        f"🌡 <b>Temperature:</b> {status.temp_celsius:.1f} °C"
+    ]
+    
+    if status.fan_rpm is not None:
+        if isinstance(status.fan_rpm, str):
+            lines.append(f"🌀 <b>Fan:</b> {status.fan_rpm}")
+        else:
+            lines.append(f"🌀 <b>Fan:</b> {status.fan_rpm:.0f} RPM")
+            
+    lines.extend([
         f"⚡ <b>Power/Throttling:</b> {status.throttling_status}",
         f"⏱ <b>Uptime:</b> {status.uptime_seconds / 3600:.1f} hours",
+        "",
+        "🔧 <b>Hardware:</b>",
+        f"  • Model: {status.pi_model}"
+    ])
+    
+    if status.core_voltage_v is not None:
+        lines.append(f"  • Core Voltage: {status.core_voltage_v:.3f} V")
+    if status.arm_clock_mhz is not None:
+        lines.append(f"  • ARM Clock: {status.arm_clock_mhz:.0f} MHz")
+        
+    lines.extend([
         "",
         "💾 <b>Memory:</b>",
         f"  • RAM: {status.ram_used_mb:.1f} MB / {status.ram_total_mb:.1f} MB",
         f"  • Disk: {status.disk_used_gb:.1f} GB / {status.disk_total_gb:.1f} GB ({status.disk_percent}%)",
         "",
         "⚙️ <b>CPU Core Usage:</b>"
-    ]
+    ])
     
     for idx, usage in enumerate(status.cpu_per_core):
         lines.append(f"  • Core {idx}: {usage}%")
+        
+    lines.append("")
+    lines.append("🔑 <b>Active SSH Sessions:</b>")
+    if status.ssh_sessions:
+        for session in status.ssh_sessions:
+            lines.append(f"  • {escape(session)}")
+    else:
+        lines.append("  • None")
         
     return "\n".join(lines)
 

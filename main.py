@@ -56,6 +56,26 @@ async def _post_init(app: Application) -> None:
     scheduler.start()
     logging.getLogger(__name__).info("APScheduler background jobs started.")
 
+    # 4. Boot notification
+    try:
+        from bot.broadcaster import broadcast_message
+        import psutil
+        from datetime import datetime
+        import socket
+        
+        boot_time_dt = datetime.fromtimestamp(psutil.boot_time())
+        formatted_boot = boot_time_dt.strftime("%Y-%m-%d %H:%M:%S")
+        hostname = socket.gethostname()
+        
+        # Broadcast to all owners via the configured broadcaster
+        await broadcast_message(
+            app,
+            text=f"🟢 <b>OverwatcherPI started</b> — {hostname}\nBoot time: {formatted_boot}\nUptime since boot: 0m",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Failed to send boot notification: {e}")
+
 
 def main():
     setup_logging()

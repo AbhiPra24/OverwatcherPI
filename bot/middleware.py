@@ -13,7 +13,7 @@ def auth_required(func):
     @functools.wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
-        if not user or user.id != config.telegram_owner_id:
+        if not user or user.id not in config.telegram_owner_ids:
             logger.warning(f"Unauthorized access attempt from user_id={user.id if user else 'None'} username={user.username if user else 'None'}")
             if update.message:
                 await update.message.reply_text("⛔ Unauthorized.", parse_mode="HTML")

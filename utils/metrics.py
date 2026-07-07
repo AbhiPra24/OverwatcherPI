@@ -16,7 +16,11 @@ class SystemStatus:
     disk_percent: float
     uptime_seconds: float
     throttling_status: str
-
+    fan_rpm: float | str | None = None
+    pi_model: str = "Unknown"
+    core_voltage_v: float | None = None
+    arm_clock_mhz: float | None = None
+    ssh_sessions: list[str] = None
 
 def get_soc_temp() -> float:
     """Read SoC temperature from the Raspberry Pi thermal zone."""
@@ -85,6 +89,81 @@ def get_throttling_status() -> str:
     return "Unknown"
 
 
+def get_service_status(service_name: str) -> str:
+    try:
+        output = subprocess.check_output(
+            ["systemctl", "is-active", service_name],
+            stderr=subprocess.STDOUT, text=True, timeout=2.0
+        )
+        return output.strip()
+    except subprocess.CalledProcessError as e:
+        return e.output.strip() if e.output else "failed"
+    except Exception:
+        return "unknown"
+
+def get_pi_model() -> str:
+    try:
+        return Path("/sys/firmware/devicetree/base/model").read_text().strip('\x00').strip()
+    except Exception:
+        return "Unknown"
+
+def get_voltage() -> float | None:
+    try:
+        output = subprocess.check_output(["vcgencmd", "measure_volts", "core"], stderr=subprocess.STDOUT, text=True)
+        if "volt=" in output:
+            return float(output.strip().replace("volt=", "").replace("V", ""))
+    except Exception:
+        pass
+    return None
+
+def get_clock_speed_mhz() -> float | None:
+    try:
+        output = subprocess.check_output(["vcgencmd", "measure_clock", "arm"], stderr=subprocess.STDOUT, text=True)
+        if "=" in output:
+            hz = float(output.strip().split("=")[1])
+            return hz / 1_000_000.0
+    except Exception:
+        pass
+    return None
+
+def get_active_ssh_sessions() -> list[str]:
+    try:
+        output = subprocess.check_output(["who"], text=True)
+        sessions = []
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 5:
+                user = parts[0]
+                tty = parts[1]
+                since = f"{parts[2]} {parts[3]}"
+                ip = parts[4] if parts[4].startswith('(') else f"({parts[4]})"
+                sessions.append(f"{user} {tty} {ip} since {since}")
+        return sessions
+    except Exception:
+        return []
+
+def get_fan_rpm():
+    if hasattr(psutil, "sensors_fans"):
+        try:
+            fans = psutil.sensors_fans()
+            if fans:
+                for name, entries in fans.items():
+                    if entries:
+                        return float(entries[0].current)
+        except Exception:
+            pass
+            
+    try:
+        for p in Path("/sys/class/thermal/").glob("cooling_device*"):
+            type_file = p / "type"
+            if type_file.exists() and "fan" in type_file.read_text().lower():
+                cur_state = (p / "cur_state").read_text().strip()
+                max_state = (p / "max_state").read_text().strip()
+                return f"Fan state: {cur_state}/{max_state}"
+    except Exception:
+        pass
+    return None
+
 def get_system_status() -> SystemStatus:
     """Collect full system diagnostics."""
     # Memory
@@ -109,5 +188,10 @@ def get_system_status() -> SystemStatus:
         disk_total_gb=disk_total_gb,
         disk_percent=disk.percent,
         uptime_seconds=uptime_seconds,
-        throttling_status=get_throttling_status()
+        throttling_status=get_throttling_status(),
+        fan_rpm=get_fan_rpm(),
+        pi_model=get_pi_model(),
+        core_voltage_v=get_voltage(),
+        arm_clock_mhz=get_clock_speed_mhz(),
+        ssh_sessions=get_active_ssh_sessions()
     )

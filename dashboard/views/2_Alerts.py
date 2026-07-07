@@ -1,12 +1,22 @@
 import streamlit as st
 import pandas as pd
 from dashboard import db
-    
+import time
+st.session_state["alerts_last_viewed"] = time.time()
+
 st.title("🚨 Alerts & Events")
+
+query_params = st.query_params
+default_category = query_params.get("category", "All")
+categories = ["All", "network", "bluetooth", "security"]
+if default_category not in categories:
+    default_category = "All"
+default_idx = categories.index(default_category)
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    category = st.selectbox("Filter by Category", ["All", "network", "bluetooth", "security"])
+    category = st.selectbox("Filter by Category", categories, index=default_idx)
+    st.query_params["category"] = category
 with col2:
     limit = st.number_input("Event Limit", min_value=10, max_value=1000, value=200)
 with col3:

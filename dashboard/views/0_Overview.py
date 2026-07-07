@@ -3,6 +3,7 @@ import pandas as pd
 from dashboard import db
 from utils import metrics
 from datetime import datetime
+import time
 from config import config
 
 st.title("🛡 OverwatcherPI Live Overview")
@@ -63,6 +64,29 @@ def live_overview():
     if "Normal" not in health.throttling_status:
         st.warning(f"System Throttling Status: {health.throttling_status}")
         
+    st.subheader("Pipeline Health")
+    with st.spinner("Fetching job heartbeats..."):
+        jobs_df = db.get_job_heartbeats()
+    if not jobs_df.empty:
+        cols = st.columns(4)
+        now = time.time()
+        for idx, row in jobs_df.iterrows():
+            col = cols[idx % 4]
+            job_name = row['job_name']
+            last_run = row['last_run_at']
+            mins_ago = (now - last_run) / 60
+            
+            warn_threshold = 15
+            if "fast_sweep" in job_name:
+                warn_threshold = config.sweep_interval_minutes * 2
+            elif "hourly" in job_name:
+                warn_threshold = 120
+            elif "speedtest" in job_name:
+                warn_threshold = config.speedtest_interval_hours * 60 * 2
+                
+            icon = "✅" if mins_ago < warn_threshold else "⚠️"
+            col.metric(f"{icon} {job_name}", f"{mins_ago:.1f}m ago")
+            
     st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
 
 live_overview()

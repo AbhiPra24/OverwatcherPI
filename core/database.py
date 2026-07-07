@@ -159,6 +159,13 @@ class DatabaseManager:
         """)
         
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS resource_alert_cooldown (
+                metric_key TEXT PRIMARY KEY,
+                last_alert_at REAL NOT NULL
+            )
+        """)
+        
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS latency_samples (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp REAL NOT NULL,
@@ -182,6 +189,13 @@ class DatabaseManager:
         if "banner_grab_attempted_at" not in cols:
             await db.execute("ALTER TABLE network_devices ADD COLUMN banner_grab_attempted_at REAL")
             await db.execute("ALTER TABLE network_devices ADD COLUMN banner_grab_attempts INTEGER DEFAULT 0")
+            
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS job_heartbeats (
+                job_name TEXT PRIMARY KEY,
+                last_run_at REAL
+            )
+        """)
             
         cursor = await db.execute("PRAGMA table_info(bt_devices)")
         cols = [row["name"] for row in await cursor.fetchall()]
@@ -555,6 +569,24 @@ class DatabaseManager:
         return False
 
     @classmethod
+    async def should_alert_resource(cls, metric_key: str, cooldown_hours: float) -> bool:
+        db = await cls.get_db()
+        current_time = time.time()
+        
+        cursor = await db.execute("SELECT last_alert_at FROM resource_alert_cooldown WHERE metric_key = ?", (metric_key,))
+        row = await cursor.fetchone()
+        
+        if row is None or (current_time - row["last_alert_at"]) >= (cooldown_hours * 3600):
+            await db.execute(
+                "INSERT INTO resource_alert_cooldown (metric_key, last_alert_at) VALUES (?, ?) ON CONFLICT(metric_key) DO UPDATE SET last_alert_at = excluded.last_alert_at",
+                (metric_key, current_time)
+            )
+            await db.commit()
+            return True
+            
+        return False
+
+    @classmethod
     async def log_latency_sample(cls, target: str, loss_pct: float, jitter_ms: float):
         db = await cls.get_db()
         await db.execute(
@@ -571,4 +603,14 @@ class DatabaseManager:
     async def update_device_vendor(cls, mac: str, vendor: str):
         db = await cls.get_db()
         await db.execute("UPDATE network_devices SET vendor = ? WHERE mac = ?", (vendor, mac))
+        await db.commit()
+
+    @classmethod
+    async def record_scan_heartbeat(cls, job_name: str):
+        import time
+        db = await cls.get_db()
+        await db.execute(
+            "INSERT INTO job_heartbeats (job_name, last_run_at) VALUES (?, ?) ON CONFLICT(job_name) DO UPDATE SET last_run_at=excluded.last_run_at",
+            (job_name, time.time())
+        )
         await db.commit()

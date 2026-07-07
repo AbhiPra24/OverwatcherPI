@@ -13,6 +13,20 @@ if not check_password():
 # Global Sidebar
 with st.sidebar:
     st.text_input("🔍 Global Search", key="global_search", placeholder="IP, MAC, Vendor, or Event...")
+    
+    import time
+    from dashboard.db import get_connection
+    last_viewed = st.session_state.get("alerts_last_viewed", 0)
+    
+    try:
+        with get_connection() as conn:
+            cur = conn.execute("SELECT COUNT(*) FROM events WHERE timestamp > ?", (last_viewed,))
+            new_alerts = cur.fetchone()[0]
+            
+        if new_alerts > 0:
+            st.markdown(f"**🚨 {new_alerts} new alert(s)**")
+    except Exception:
+        pass
 
 # Define Pages
 overview = st.Page("views/0_Overview.py", title="Live Overview", icon="🛡️")

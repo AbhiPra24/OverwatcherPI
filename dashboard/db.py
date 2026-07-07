@@ -121,6 +121,14 @@ def get_latency_history(hours: int = 24) -> pd.DataFrame:
         st.error(f"Database error: {e}")
         return pd.DataFrame()
 
+def get_job_heartbeats() -> pd.DataFrame:
+    """Fetch pipeline job heartbeats."""
+    with get_connection() as conn:
+        try:
+            return pd.read_sql_query("SELECT * FROM job_heartbeats", conn)
+        except Exception as e:
+            return pd.DataFrame(columns=["job_name", "last_run_at"])
+
 @st.cache_data(ttl=30)
 def get_device_ports(mac: str) -> pd.DataFrame:
     try:

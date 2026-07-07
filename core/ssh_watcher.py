@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 from config import config
 from core.database import DatabaseManager
 from utils.osint import get_ip_info
+from bot.broadcaster import broadcast_message
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +22,8 @@ async def ssh_log_watcher(app: Application):
     except Exception as e:
         logger.error(f"SSH watcher cannot read {log_file}: {e}")
         try:
-            await app.bot.send_message(
-                chat_id=config.telegram_owner_id,
+            await broadcast_message(
+                app,
                 text=f"⚠️ <b>SSH Watcher Failed to Start:</b>\nCannot read <code>{log_file}</code>.\nError: {html.escape(str(e))}",
                 parse_mode=ParseMode.HTML
             )
@@ -68,8 +69,8 @@ async def ssh_log_watcher(app: Application):
                             async def send_alert(alert_ip, escaped_ip):
                                 osint_data = await get_ip_info(alert_ip)
                                 try:
-                                    await app.bot.send_message(
-                                        chat_id=config.telegram_owner_id,
+                                    await broadcast_message(
+                                        app,
                                         text=f"🚨 <b>SSH Brute Force Detected:</b>\n5 failed logins in 10 mins from IP: <code>{escaped_ip}</code>\n\n<b>OSINT Data:</b>\n<pre>{html.escape(osint_data)}</pre>",
                                         parse_mode=ParseMode.HTML
                                     )
@@ -92,8 +93,8 @@ async def ssh_log_watcher(app: Application):
                         ip = parts[idx + 1]
                         safe_ip = html.escape(ip)
                         try:
-                            await app.bot.send_message(
-                                chat_id=config.telegram_owner_id,
+                            await broadcast_message(
+                                app,
                                 text=f"✅ <b>SSH Login Successful:</b>\nFrom IP: <code>{safe_ip}</code>",
                                 parse_mode=ParseMode.HTML
                             )

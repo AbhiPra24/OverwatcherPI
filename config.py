@@ -1,4 +1,5 @@
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
+from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
@@ -11,7 +12,15 @@ class Settings(BaseSettings):
     )
 
     telegram_bot_token: SecretStr
-    telegram_owner_id: int
+    telegram_owner_ids: List[int]
+
+    @field_validator("telegram_owner_ids", mode="before")
+    def parse_owner_ids(cls, v):
+        if isinstance(v, str):
+            return [int(x.strip()) for x in v.split(",") if x.strip()]
+        if isinstance(v, int):
+            return [v]
+        return v
     scan_subnet: str = "192.168.1.0/24"
     max_concurrent_scans: int = 2
     gateway_ip: str = "192.168.1.1"
@@ -34,7 +43,17 @@ class Settings(BaseSettings):
     ble_proximity_near_dbm: int = -70
     sweep_interval_minutes: int = 5
     speedtest_interval_hours: int = 3
+    cpu_warn_percent: float = 85.0
+    ram_warn_percent: float = 85.0
+    disk_warn_percent: float = 90.0
+    resource_alert_cooldown_hours: float = 1.0
+    watched_services: List[str] = ["overwatcher-dashboard", "overwatcher-caddy", "overwatcher-sniffer"]
 
+    @field_validator("watched_services", mode="before")
+    def parse_watched_services(cls, v):
+        if isinstance(v, str):
+            return [x.strip() for x in v.split(",") if x.strip()]
+        return v
 
 # Singleton instance for the application
 config = Settings()
