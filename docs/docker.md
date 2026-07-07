@@ -84,3 +84,21 @@ If something goes wrong:
 docker compose down
 sudo systemctl enable --now overwatcher overwatcher-sniffer overwatcher-dashboard overwatcher-caddy
 ```
+
+## Restore from Backup
+
+OverwatcherPI creates automated daily DB backups in `data/backups/`. To restore a backup:
+
+```bash
+# 1. Stop the bot so it drops the database lock
+docker compose stop bot
+
+# 2. Rename the current database (just in case)
+mv data/netmon.db data/netmon.db.corrupt
+
+# 3. Copy the chosen backup into place
+cp data/backups/netmon-YYYYMMDD.db data/netmon.db
+
+# 4. Start the bot again
+docker compose start bot
+```

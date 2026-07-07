@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     db_path: Path = Field(default=Path("data/netmon.db"))
     dashboard_password: str = ""
     db_retention_days: int = 90
+    db_backup_retention_days: int = 30
     log_level: str = "INFO"
     log_format: str = "text"
     log_file: Path = Field(default=Path("logs/overwatcher.log"))
@@ -52,7 +53,7 @@ class Settings(BaseSettings):
     quiet_hours_start: int = 1
     quiet_hours_end: int = 5
     network_jitter_threshold_ms: float = 50.0
-    api_token: str = "CHANGE-ME-set-API_TOKEN-in-env"
+    api_token: str
     api_port: int = 8000
 
     @field_validator("watched_services", mode="before")

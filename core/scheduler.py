@@ -434,6 +434,15 @@ def setup_scheduler(app: Application) -> AsyncIOScheduler:
         id="db_retention"
     )
     
+    # Schedule DB Backup Job (Daily at 4 AM)
+    scheduler.add_job(
+        db_backup_job,
+        "cron",
+        hour=4,
+        args=[app],
+        id="db_backup"
+    )
+    
     # Schedule Service Watchdog
     scheduler.add_job(
         service_watchdog_job,
@@ -602,3 +611,33 @@ async def db_retention_job(app: Application):
         await DatabaseManager.record_scan_heartbeat("db_retention")
     except Exception as e:
         logger.error(f"DB retention job failed: {e}")
+
+async def db_backup_job(app: Application):
+    """Daily job to safely backup the WAL-mode database."""
+    logger.info("Running DB backup job...")
+    try:
+        backup_dir = Path("data/backups")
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d")
+        backup_file = backup_dir / f"netmon-{timestamp}.db"
+        
+        def perform_backup(src_db_path: str, dst_db_path: str):
+            import sqlite3
+            with sqlite3.connect(src_db_path) as src, sqlite3.connect(dst_db_path) as dst:
+                src.backup(dst)
+                
+        await asyncio.to_thread(perform_backup, str(config.db_path), str(backup_file))
+        logger.info(f"DB backup created at {backup_file}")
+        
+        # Enforce retention
+        if config.db_backup_retention_days > 0:
+            backups = sorted(backup_dir.glob("netmon-*.db"))
+            if len(backups) > config.db_backup_retention_days:
+                for old_backup in backups[:-config.db_backup_retention_days]:
+                    old_backup.unlink()
+                    logger.info(f"Deleted old backup: {old_backup.name}")
+                    
+        await DatabaseManager.record_scan_heartbeat("db_backup")
+    except Exception as e:
+        logger.error(f"DB backup job failed: {e}")
