@@ -24,8 +24,8 @@ async def _post_init(app: Application) -> None:
     await oui.load_or_refresh()
     
     # 2b. Ensure DNS blocklist is cached
-    from core import dns_blocklist
-    await dns_blocklist.load_or_refresh()
+    from core import threat_intel
+    await threat_intel.load_or_refresh()
     
     # 3. Start APScheduler within this event loop
     scheduler = setup_scheduler(app)

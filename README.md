@@ -252,7 +252,8 @@ See [`docs/docker.md`](docs/docker.md) for the full migration guide, healthcheck
 | `LOG_FORMAT` | `text` | `text` or `json` (for jq-able logs) |
 | `WATCHED_SERVICES` | `["overwatcher-dashboard","overwatcher-caddy","overwatcher-sniffer"]` | Services to health-monitor |
 | `HONEYPOT_ENABLED` | `false` | Enable canary honeypot listener |
-| `DNS_BLOCKLIST_ENABLED`| `false`| Alert on malware/ads domain queries |
+| `DNS_RETENTION_DAYS`   | `14`   | Days to retain DNS logs |
+| `THREAT_INTEL_ENABLED` | `false`| Alert on malware/ads domain and IP queries |
 | `CPU_WARN_PERCENT` | `85.0` | CPU alert threshold |
 | `RAM_WARN_PERCENT` | `85.0` | RAM alert threshold |
 | `DISK_WARN_PERCENT` | `90.0` | Disk alert threshold |

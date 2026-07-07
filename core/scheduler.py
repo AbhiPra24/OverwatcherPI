@@ -385,14 +385,14 @@ def setup_scheduler(app: Application) -> AsyncIOScheduler:
         id="oui_refresh"
     )
     
-    # Schedule DNS Blocklist refresh (weekly)
-    from core import dns_blocklist
+    # Schedule Threat Intel refresh (weekly)
+    from core import threat_intel
     scheduler.add_job(
-        dns_blocklist.load_or_refresh,
+        threat_intel.load_or_refresh,
         "interval",
         hours=168,
         args=[True],  # force=True
-        id="dns_blocklist_refresh"
+        id="threat_intel_refresh"
     )
     
     # Schedule speedtest

@@ -11,7 +11,7 @@ from telegram import Bot
 from core.dhcp_watcher import DHCPWatcher
 from core.arp_watcher import ARPWatcher
 from core.dns_watcher import DNSWatcher
-from core import dns_blocklist
+from core import threat_intel
 
 from core.logging_setup import configure_logging
 import logging
@@ -33,7 +33,7 @@ async def main():
     dns_watcher = DNSWatcher(bot)
     
     # Load DNS blocklist if enabled
-    await dns_blocklist.load_or_refresh()
+    await threat_intel.load_or_refresh()
     
     loop = asyncio.get_running_loop()
     
