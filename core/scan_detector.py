@@ -13,8 +13,9 @@ from bot.broadcaster import broadcast_message
 logger = logging.getLogger(__name__)
 
 class ScanDetector:
-    def __init__(self, bot: Application):
+    def __init__(self, bot: Application, loop):
         self.bot = bot
+        self.loop = loop
         # src_ip -> { (dst_ip, dst_port) }
         self.recent_syns: Dict[str, Set[str]] = defaultdict(set)
         # src_ip -> list of timestamps
@@ -68,5 +69,5 @@ class ScanDetector:
                     logger.error(f"Failed to send scan alert: {e}")
                     
         # Fire and forget
-        loop = asyncio.get_running_loop()
-        asyncio.run_coroutine_threadsafe(_alert(), loop)
+        import asyncio
+        asyncio.run_coroutine_threadsafe(_alert(), self.loop)

@@ -88,7 +88,7 @@ async def fetch_feed(session: aiohttp.ClientSession, name: str, info: Dict[str, 
     return name, set(), set()
 
 async def load_or_refresh(force: bool = False):
-    if not getattr(config, "threat_intel_enabled", True): # defaulting to True for backward compat
+    if not config.threat_intel_enabled:
         return
         
     global BLOCKED_DOMAINS, BLOCKED_IPS

@@ -36,12 +36,12 @@ async def main():
     # Load DNS blocklist if enabled
     await threat_intel.load_or_refresh()
     
+    loop = asyncio.get_running_loop()
+    
     scan_detector = None
     if config.syn_scan_detection_enabled:
         from core.scan_detector import ScanDetector
-        scan_detector = ScanDetector(bot)
-    
-    loop = asyncio.get_running_loop()
+        scan_detector = ScanDetector(bot, loop)
     
     def packet_callback(pkt):
         if ARP in pkt:
