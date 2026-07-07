@@ -2,7 +2,6 @@
 import sys
 import os
 import asyncio
-import logging
 
 # Ensure parent dir is in sys.path so we can import config/core
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,7 +11,9 @@ from telegram import Bot
 from core.dhcp_watcher import DHCPWatcher
 from core.arp_watcher import ARPWatcher
 
-logging.basicConfig(level=getattr(logging, config.log_level.upper()), format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+from core.logging_setup import configure_logging
+import logging
+configure_logging("sniffer")
 logger = logging.getLogger("sniffer")
 
 async def main():

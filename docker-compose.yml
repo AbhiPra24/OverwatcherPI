@@ -1,0 +1,89 @@
+# OverwatcherPI — full stack compose
+# See docs/docker.md for pre-flight and migration steps.
+services:
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: overwatcher-bot
+    network_mode: host          # required: nmap ARP discovery + BlueZ D-Bus
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - /var/run/dbus:/var/run/dbus  # BlueZ D-Bus passthrough (see docs/docker.md)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+        "import sqlite3, time, sys; \
+         conn = sqlite3.connect('/app/data/netmon.db'); \
+         row = conn.execute(\"SELECT last_run_at FROM job_heartbeats WHERE job_name='fast_sweep'\").fetchone(); \
+         sys.exit(0 if row and (time.time()-row[0]) < 900 else 1)"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 2m
+
+  sniffer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: overwatcher-sniffer
+    command: python bin/sniffer_daemon.py
+    network_mode: host          # required: must see real LAN ARP/DHCP traffic
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "sniffer_daemon.py"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    container_name: overwatcher-dashboard
+    # No ports: — intentionally not published to host.
+    # Caddy reaches it via the internal network only.
+    env_file: .env
+    volumes:
+      - ./data:/app/data:ro
+      - ./logs:/app/logs
+    networks:
+      - internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: overwatcher-caddy
+    ports:
+      - "8109:8109"
+    volumes:
+      - ./dashboard/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - internal
+    depends_on:
+      - dashboard
+    restart: unless-stopped
+
+networks:
+  internal:
+    driver: bridge

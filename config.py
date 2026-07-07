@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     dashboard_password: str = ""
     db_retention_days: int = 90
     log_level: str = "INFO"
+    log_format: str = "text"
     log_file: Path = Field(default=Path("logs/overwatcher.log"))
     hourly_report_enabled: bool = True
     macvendors_api_enabled: bool = True

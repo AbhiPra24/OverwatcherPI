@@ -1,6 +1,5 @@
 import logging
 import asyncio
-from logging.handlers import RotatingFileHandler
 from telegram.ext import Application
 
 from config import config
@@ -11,36 +10,9 @@ from bot.app import setup_application
 
 
 def setup_logging():
-    """Configure structured logging."""
-    # Ensure log directory exists
-    config.log_file.parent.mkdir(parents=True, exist_ok=True)
-    
-    log_level = getattr(logging, config.log_level.upper(), logging.INFO)
-    
-    formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    )
-    
-    # File handler with rotation (5 MB per file, max 3 backups)
-    file_handler = RotatingFileHandler(
-        config.log_file, maxBytes=5 * 1024 * 1024, backupCount=3
-    )
-    file_handler.setFormatter(formatter)
-    
-    # Stream handler for systemd journal
-    stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(formatter)
-    
-    # Configure root logger
-    logging.basicConfig(
-        level=log_level,
-        handlers=[file_handler, stream_handler]
-    )
-    
-    # Tone down noisy libraries
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("apscheduler").setLevel(logging.WARNING)
-    logging.getLogger("bleak").setLevel(logging.WARNING)
+    """Configure structured logging via the shared logging_setup helper."""
+    from core.logging_setup import configure_logging
+    configure_logging("overwatcher")
 
 
 async def _post_init(app: Application) -> None:

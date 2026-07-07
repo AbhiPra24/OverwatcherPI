@@ -2,6 +2,9 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core.logging_setup import configure_logging
+configure_logging("dashboard")
+
 import streamlit as st
 from auth import check_password
 
