@@ -161,16 +161,37 @@ async def scheduled_speedtest_job(app: Application):
     def run_st():
         import speedtest
         st = speedtest.Speedtest()
-        st.get_best_server()
+        
+        st.get_servers()
+        st.get_best_server(st.get_servers())
+        server = st.get_best_server()
+        ping = server.get("latency", 0)
+        
+        if ping > 5000:
+            servers_by_dist = sorted(
+                [s for sublist in st.servers.values() for s in sublist],
+                key=lambda s: s.get("d", 999999)
+            )
+            for candidate in servers_by_dist[:10]:
+                try:
+                    candidate_ping = st.get_best_server([candidate]).get("latency", 99999)
+                    if candidate_ping < ping:
+                        ping = candidate_ping
+                        break
+                except Exception:
+                    continue
+                    
         d = st.download()
-        return d / 1_000_000
+        return d / 1_000_000, ping
         
     try:
-        d_mbps = await asyncio.to_thread(run_st)
-        if d_mbps < 50.0:  # arbitrary threshold
+        d_mbps, ping = await asyncio.to_thread(run_st)
+        
+        # Don't alert if the server timed out or speed is 0 due to an error
+        if d_mbps > 0 and d_mbps < 50.0 and ping < 5000:
             await broadcast_message(
                 app,
-                text=f"⚠️ <b>Internet Speed Alert:</b>\nDownload speed dropped to {d_mbps:.2f} Mbps",
+                text=f"⚠️ <b>Internet Speed Alert:</b>\nDownload speed dropped to {d_mbps:.2f} Mbps (Ping: {ping:.1f} ms)",
                 parse_mode=ParseMode.HTML
             )
         await DatabaseManager.record_scan_heartbeat("speedtest")

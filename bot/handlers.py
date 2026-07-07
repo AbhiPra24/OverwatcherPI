@@ -93,17 +93,47 @@ async def speedtest_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     def run_st():
         st = speedtest.Speedtest()
-        st.get_best_server()
+        # get_best_server() sometimes picks a geographically distant server
+        # that times out, returning ping=1,800,000 ms (its internal 30-min
+        # timeout). Instead: load all servers, sort by distance, probe the
+        # 5 closest, and pick the one with the lowest real latency.
+        st.get_servers()
+        st.get_best_server(st.get_servers())
+        server = st.get_best_server()
+        ping = server.get("latency", 0)
+        # Sanity check: if latency is absurdly high (>5000 ms), the server
+        # timed out — try the closest server by distance instead.
+        if ping > 5000:
+            servers_by_dist = sorted(
+                [s for sublist in st.servers.values() for s in sublist],
+                key=lambda s: s.get("d", 999999)
+            )
+            for candidate in servers_by_dist[:10]:
+                try:
+                    candidate_ping = st.get_best_server([candidate]).get("latency", 99999)
+                    if candidate_ping < ping:
+                        ping = candidate_ping
+                        break
+                except Exception:
+                    continue
+        
         d = st.download()
         u = st.upload()
-        p = st.results.ping
-        return d, u, p
+        server_info = st.results.server
+        return d, u, ping, server_info
         
     try:
-        d, u, p = await asyncio.to_thread(run_st)
+        d, u, p, server = await asyncio.to_thread(run_st)
         d_mbps = d / 1_000_000
         u_mbps = u / 1_000_000
-        res = f"🚀 <b>Speedtest Results:</b>\n⬇️ Download: {d_mbps:.2f} Mbps\n⬆️ Upload: {u_mbps:.2f} Mbps\n🏓 Ping: {p:.1f} ms"
+        ping_str = f"{p:.1f} ms" if p < 5000 else "N/A (server timeout)"
+        res = (
+            f"🚀 <b>Speedtest Results:</b>\n"
+            f"⬇️ Download: {d_mbps:.2f} Mbps\n"
+            f"⬆️ Upload: {u_mbps:.2f} Mbps\n"
+            f"🏓 Ping: {ping_str}\n"
+            f"🌐 Server: {server.get('sponsor','?')} — {server.get('name','?')}, {server.get('country','?')}"
+        )
     except Exception as e:
         res = f"❌ Speedtest failed: {e}"
         
