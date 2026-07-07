@@ -7,8 +7,12 @@ A fully async, modular, open-source daemon that streams telemetry to a secure Te
 - **BLE Discovery:** Async Bluetooth Low Energy scanning via `bleak`.
 - **Differential Tracking:** Automatically diffs current topology against baseline and flags new devices.
 - **Intruder Defense:** Runs targeted `nmap -sV` port scans on unknown devices before alerting you.
+- **Port Drift Tracking:** Scans known devices daily to detect and alert on newly opened ports.
 - **Ping Monitor:** Pin critical infrastructure hosts for constant 1-minute uptime checks.
+- **Latency & Quality Monitoring:** Continuously tracks gateway and WAN ping jitter and loss.
 - **SSH Auth Monitoring:** Actively tails `/var/log/auth.log` for brute-force attacks and successful logins.
+- **Passive Sniffer:** Separate unprivileged daemon tracking rogue DHCP servers and ARP spoofing conflicts.
+- **Web Dashboard:** Read-only Streamlit dashboard for historical topology, device search, and event logging over your LAN.
 - **System Diagnostics:** Reports Pi CPU, RAM, Disk, SoC temperature, and checks for under-voltage/throttling events.
 
 ## Hardware & OS Requirements
@@ -52,6 +56,14 @@ A fully async, modular, open-source daemon that streams telemetry to a secure Te
    nano .env
    ```
 
+6. **Dashboard Setup:**
+   The Streamlit dashboard requires a separate virtual environment to avoid dependency conflicts:
+   ```bash
+   python3 -m venv dashboard/venv
+   source dashboard/venv/bin/activate
+   pip install -r dashboard/requirements-dashboard.txt
+   ```
+
 ## Running Locally (Development)
 ```bash
 source venv/bin/activate
@@ -67,11 +79,26 @@ The recommended deployment path is `/opt/OverwatcherPI/`.
    sudo chown -R your_username:your_username /opt/OverwatcherPI
    ```
 
-2. **Enable systemd service:**
+2. **Enable Main Service:**
    ```bash
    sudo cp /opt/OverwatcherPI/overwatcher.service /etc/systemd/system/
    sudo systemctl daemon-reload
    sudo systemctl enable --now overwatcher
+   ```
+
+3. **Enable Passive Sniffer Service (Optional):**
+   ```bash
+   sudo ln -s /opt/OverwatcherPI/overwatcher-sniffer.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now overwatcher-sniffer
+   ```
+
+4. **Running the Dashboard:**
+   To view the historical logs and alerts, use the provided scripts.
+   *(Make sure you run Step 6 of Installation first)*
+   ```bash
+   ./dashboard/start_dashboard.sh
+   # To stop: ./dashboard/stop_dashboard.sh
    ```
 
 ## Telegram Commands
@@ -79,6 +106,8 @@ The recommended deployment path is `/opt/OverwatcherPI/`.
 - `/network` — Trigger immediate local subnet sweep
 - `/bluetooth` — Trigger immediate 10-second BLE discovery
 - `/speedtest` — Run internet speed test
+- `/traceroute <host>` — Run an on-demand traceroute
+- `/attacker <ip>` — Run WHOIS OSINT lookup on an IP
 - `/whitelist <mac>` — Mark a device MAC as safe
 - `/monitor <ip>` — Pin a critical host for 1-minute downtime checks
 - `/unmonitor <ip>` — Remove a host from ping monitor
