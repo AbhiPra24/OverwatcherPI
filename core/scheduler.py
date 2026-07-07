@@ -297,6 +297,7 @@ async def service_watchdog_job(app: Application):
                     )
                 except Exception:
                     pass
+    await DatabaseManager.record_scan_heartbeat("service_watchdog")
 
 async def resource_health_job(app: Application):
     """Proactively monitor resource usage."""
@@ -346,6 +347,7 @@ async def resource_health_job(app: Application):
             await broadcast_message(app, text=msg, parse_mode=ParseMode.HTML)
         except Exception:
             pass
+    await DatabaseManager.record_scan_heartbeat("resource_health")
 
 def setup_scheduler(app: Application) -> AsyncIOScheduler:
     """Initialize APScheduler with jobs."""

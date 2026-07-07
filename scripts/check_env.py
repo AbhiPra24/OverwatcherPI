@@ -22,28 +22,40 @@ def main():
                     keys.add(line.split("=", 1)[0].strip())
         return keys
 
+    sys.path.append(str(root_dir))
+    from config import Settings
+    schema_keys = {k.upper() for k in Settings.model_fields.keys()}
+
     example_keys = parse_keys(example_file)
     env_keys = parse_keys(env_file)
     
     if not env_keys:
-        print("Warning: .env file not found or empty.")
-        sys.exit(0)
+        print("Warning: .env file not found or empty. Skipping .env comparison.")
+    
+    missing_in_example = schema_keys - example_keys
 
     missing = example_keys - env_keys
     stale = env_keys - example_keys
 
     issues = 0
-    if missing:
-        print("❌ Missing keys in .env (present in .env.example):")
-        for k in sorted(missing):
+    if missing_in_example:
+        print("❌ Missing keys in .env.example (present in config schema):")
+        for k in sorted(missing_in_example):
             print(f"  - {k}")
         issues += 1
-        
-    if stale:
-        print("⚠️  Stale keys in .env (not in .env.example):")
-        for k in sorted(stale):
-            print(f"  - {k}")
-        issues += 1
+
+    if env_keys:
+        if missing:
+            print("❌ Missing keys in .env (present in .env.example):")
+            for k in sorted(missing):
+                print(f"  - {k}")
+            issues += 1
+            
+        if stale:
+            print("⚠️  Stale keys in .env (not in .env.example):")
+            for k in sorted(stale):
+                print(f"  - {k}")
+            issues += 1
 
     if issues == 0:
         print("✅ .env is fully in sync with .env.example")

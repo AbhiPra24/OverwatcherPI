@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     sniffer_interface: str = ""
     trusted_dhcp_server: str = ""
     db_path: Path = Field(default=Path("data/netmon.db"))
-    dashboard_password: str = ""
+    dashboard_password: str
     db_retention_days: int = 90
     db_backup_retention_days: int = 30
     dns_retention_days: int = 14

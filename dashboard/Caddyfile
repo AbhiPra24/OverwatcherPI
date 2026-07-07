@@ -5,5 +5,5 @@
         admin $2a$14$s0JVrz0ctvruLg0qBOFNHOJcokhEkfJyum41CtVy.Nqu5UwfI8oWm
     }
     reverse_proxy /api/* localhost:8000
-    reverse_proxy dashboard:8501
+    reverse_proxy localhost:8501
 }

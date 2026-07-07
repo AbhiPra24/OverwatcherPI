@@ -71,6 +71,7 @@ def setup_application(post_init_hook=None):
     app.add_handler(CommandHandler("traceroute", handlers.traceroute_handler))
     app.add_handler(CommandHandler("export", handlers.export_handler))
     app.add_handler(CommandHandler("logs", handlers.logs_handler))
+    app.add_handler(CommandHandler("attacker", handlers.attacker_handler))
     
     from telegram.ext import CallbackQueryHandler
     app.add_handler(CallbackQueryHandler(handlers.callback_query_handler))

@@ -27,8 +27,8 @@ services:
       test: ["CMD", "python", "-c",
         "import sqlite3, time, sys; \
          conn = sqlite3.connect('/app/data/netmon.db'); \
-         row = conn.execute(\"SELECT last_run_at FROM job_heartbeats WHERE job_name='fast_sweep'\").fetchone(); \
-         sys.exit(0 if row and (time.time()-row[0]) < 900 else 1)"]
+         rows = conn.execute(\"SELECT last_run_at FROM job_heartbeats WHERE job_name IN ('fast_sweep', 'service_watchdog', 'resource_health')\").fetchall(); \
+         sys.exit(0 if len(rows) == 3 and all((time.time()-r[0]) < 900 for r in rows) else 1)"]
       interval: 5m
       timeout: 10s
       retries: 3
@@ -68,8 +68,9 @@ services:
     volumes:
       - ./data:/app/data:ro
       - ./logs:/app/logs
-    networks:
-      - internal
+    # Exposed to localhost only so Caddy on host network can reach it
+    ports:
+      - "127.0.0.1:8501:8501"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
@@ -81,16 +82,9 @@ services:
   caddy:
     image: caddy:2-alpine
     container_name: overwatcher-caddy
-    ports:
-      - "8109:8109"
+    network_mode: host
     volumes:
       - ./dashboard/Caddyfile:/etc/caddy/Caddyfile:ro
-    networks:
-      - internal
     depends_on:
       - dashboard
     restart: unless-stopped
-
-networks:
-  internal:
-    driver: bridge

@@ -47,3 +47,7 @@ jobs:
     - name: Run Pytest
       run: |
         PYTHONPATH=. pytest tests/
+        
+    - name: Check Environment Variables Sync
+      run: |
+        PYTHONPATH=. python scripts/check_env.py
