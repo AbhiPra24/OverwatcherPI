@@ -148,9 +148,7 @@ async def scan() -> List[NetworkDevice]:
     mdns_results = await mdns_task
     ssdp_results = await ssdp_task
     
-    results = []
-    
-    for raw in raw_devices:
+    async def process_device(raw):
         ip = raw["ip"]
         vendor = await oui.get_vendor(raw["mac"])
         if vendor == "Unknown" and raw["nmap_vendor"] != "Unknown":
@@ -166,7 +164,7 @@ async def scan() -> List[NetworkDevice]:
         if not hostname:
             hostname = await _resolve_hostname(ip)
             
-        results.append({
+        return {
             "ip": ip,
             "mac": raw["mac"],
             "vendor": vendor,
@@ -174,9 +172,11 @@ async def scan() -> List[NetworkDevice]:
             "raw_mdns_name": mdns_name,
             "raw_ssdp_server": ssdp_server,
             "raw_netbios_name": netbios_name
-        })
+        }
 
-    for res in results:
+    results = await asyncio.gather(*(process_device(raw) for raw in raw_devices))
+
+    async def grab_banner(res):
         if res["vendor"] == "Unknown" and not res["hostname"]:
             try:
                 ip = res["ip"]
@@ -203,6 +203,8 @@ async def scan() -> List[NetworkDevice]:
                     b_proc.kill()
             except Exception as e:
                 logger.debug(f"Banner grab failed for {res['ip']}: {e}")
+
+    await asyncio.gather(*(grab_banner(res) for res in results))
 
     final_results = []
     for res in results:
