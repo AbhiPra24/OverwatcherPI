@@ -1,7 +1,7 @@
 import logging
 from typing import List
 from fastapi import FastAPI, Depends, HTTPException, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import APIKeyHeader
 import uvicorn
 import asyncio
 from pydantic import BaseModel
@@ -12,16 +12,15 @@ from core.database import DatabaseManager, NetworkDevice
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="OverwatcherPI API", version="1.0.0")
-security = HTTPBearer()
+api_key_header = APIKeyHeader(name="X-API-Token")
 
-def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
-    if credentials.credentials != config.api_token:
+def verify_token(api_key: str = Security(api_key_header)):
+    if api_key != config.api_token:
         raise HTTPException(
             status_code=401,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Invalid X-API-Token",
         )
-    return credentials.credentials
+    return api_key
 
 class DeviceResponse(BaseModel):
     mac: str
