@@ -20,8 +20,8 @@ flowchart TD
         subgraph BOT["overwatcher-bot  [network_mode: host]"]
             NMAP["🔍 Network Scanner\nnmap ARP sweep + zeroconf mDNS"]
             BLE["📡 BLE Scanner\nbleak via D-Bus passthrough"]
-            SCHED["⏱️ APScheduler\nfast_sweep · hourly_report\nport_drift · latency · speedtest\ndeferred_scan"]
-            API["🌐 FastAPI :8000\nGET /api/devices\n(Bearer token auth)"]
+            SCHED["⏱️ APScheduler\nfast_sweep · hourly_report\nport_drift · latency · speedtest\ndeferred_scan · db_backup · heartbeat"]
+            API["🌐 FastAPI :8000\nGET /api/devices\n(Protected by Caddy Basic Auth)"]
             TGBOT["🤖 Telegram Bot\npolling"]
         end
 
@@ -118,11 +118,18 @@ flowchart TD
 - **Resource Alerts** — configurable CPU/RAM/disk thresholds with cooldown periods
 - **Job Heartbeats** — every scheduled job records its last run time; used as Docker healthcheck source
 
+### 🛠️ Reliability & Maintainability
+- **Automated DB Backups** — SQLite `.backup` API safely dumps the live database every night
+- **Config Drift Detection** — Hashes your active configuration and alerts you if manual edits drift from the baseline
+- **Dead-Man's Switch** — Telegram heartbeat tracking and fallback file logging ensures you never fail silently
+- **Command Abuse Guard** — In-memory rate limits protect the hardware scanners from API or bot flood attacks
+- **Automated Testing** — Fully tested via `pytest` to validate database interactions and rate-limiting
+
 ### 🌐 Interfaces
 - **Telegram Bot** — real-time alerts + on-demand commands
 - **Streamlit Dashboard** — LAN-accessible; device history, security posture, trends, port history, event log
-- **FastAPI REST endpoint** — `GET /api/devices` with Bearer token auth for external integrations
-- **Caddy Reverse Proxy** — HTTPS-grade Basic Auth protecting the dashboard; never exposes Streamlit directly
+- **FastAPI REST endpoint** — `GET /api/devices` for programmatic access
+- **Caddy Reverse Proxy** — HTTPS-grade Basic Auth protects both the Dashboard and the `/api/*` endpoints; never exposes internal ports directly
 
 ---
 
