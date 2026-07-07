@@ -120,3 +120,56 @@ def get_latency_history(hours: int = 24) -> pd.DataFrame:
     except Exception as e:
         st.error(f"Database error: {e}")
         return pd.DataFrame()
+
+@st.cache_data(ttl=30)
+def get_device_ports(mac: str) -> pd.DataFrame:
+    try:
+        with get_connection() as conn:
+            df = pd.read_sql_query("SELECT port, service, first_seen, last_seen, is_active FROM device_ports WHERE mac = ?", conn, params=(mac,))
+            if not df.empty:
+                df['first_seen'] = pd.to_datetime(df['first_seen'], unit='s')
+                df['last_seen'] = pd.to_datetime(df['last_seen'], unit='s')
+            return df
+    except Exception as e:
+        st.error(f"Database error: {e}")
+        return pd.DataFrame()
+
+@st.cache_data(ttl=30)
+def get_device_events(mac: str) -> pd.DataFrame:
+    try:
+        with get_connection() as conn:
+            df = pd.read_sql_query("SELECT timestamp, category, severity, message FROM events WHERE related_id = ? ORDER BY timestamp DESC", conn, params=(mac,))
+            if not df.empty:
+                df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+            return df
+    except Exception as e:
+        st.error(f"Database error: {e}")
+        return pd.DataFrame()
+
+@st.cache_data(ttl=30)
+def get_security_posture(days: int = 7) -> dict:
+    import time
+    try:
+        cutoff = time.time() - (days * 86400)
+        with get_connection() as conn:
+            cur = conn.execute("SELECT COUNT(*) as count FROM network_devices WHERE is_active = 1 AND is_known = 0")
+            unwhitelisted = cur.fetchone()[0]
+            
+            cur = conn.execute("SELECT COUNT(*) as count FROM events WHERE category = 'network' AND message LIKE 'Port Drift Alert%' AND timestamp >= ?", (cutoff,))
+            port_drift = cur.fetchone()[0]
+            
+            cur = conn.execute("SELECT COUNT(*) as count FROM events WHERE category = 'security' AND (message LIKE '%DHCP%' OR message LIKE '%ARP%') AND timestamp >= ?", (cutoff,))
+            rogue_network = cur.fetchone()[0]
+            
+            cur = conn.execute("SELECT COUNT(*) as count FROM events WHERE category = 'security' AND message LIKE '%SSH%' AND timestamp >= ?", (cutoff,))
+            ssh_events = cur.fetchone()[0]
+            
+            return {
+                "unwhitelisted_active": unwhitelisted,
+                "port_drift_weekly": port_drift,
+                "rogue_network_weekly": rogue_network,
+                "ssh_events_weekly": ssh_events
+            }
+    except Exception as e:
+        st.error(f"Database error: {e}")
+        return {}

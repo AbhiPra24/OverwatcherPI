@@ -1,15 +1,6 @@
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
 import streamlit as st
 import pandas as pd
 from dashboard import db
-from auth import check_password
-
-st.set_page_config(page_title="Device History - OverwatcherPI", layout="wide")
-if not check_password():
-    st.stop()
     
 st.title("📖 Device History")
 
@@ -24,15 +15,14 @@ with tab1:
         net_df = db.get_all_network_devices(days=days_net)
     
     if not net_df.empty:
-        search_net = st.text_input("Search Network Devices (IP, MAC, Vendor, Hostname):")
+        search_term = st.session_state.get("global_search", "").lower()
         
-        if search_net:
-            search_net = search_net.lower()
+        if search_term:
             mask = (
-                net_df['ip'].str.lower().str.contains(search_net, na=False) |
-                net_df['mac'].str.lower().str.contains(search_net, na=False) |
-                net_df['vendor'].str.lower().str.contains(search_net, na=False) |
-                net_df['hostname'].str.lower().str.contains(search_net, na=False)
+                net_df['ip'].str.lower().str.contains(search_term, na=False) |
+                net_df['mac'].str.lower().str.contains(search_term, na=False) |
+                net_df['vendor'].str.lower().str.contains(search_term, na=False) |
+                net_df['hostname'].str.lower().str.contains(search_term, na=False)
             )
             display_df = net_df[mask].copy()
         else:
@@ -52,7 +42,18 @@ with tab1:
         display_df['vendor_badge'] = display_df['vendor'].apply(format_vendor)
         
         # Display with new column order
-        st.dataframe(display_df[['ip', 'mac', 'vendor_badge', 'hostname', 'first_seen', 'last_seen', 'is_known', 'is_active']], width="stretch")
+        event = st.dataframe(
+            display_df[['ip', 'mac', 'vendor_badge', 'hostname', 'first_seen', 'last_seen', 'is_known', 'is_active']], 
+            width="stretch",
+            on_select="rerun",
+            selection_mode="single-row"
+        )
+        
+        if event and len(event.selection.rows) > 0:
+            selected_idx = event.selection.rows[0]
+            mac = display_df.iloc[selected_idx]['mac']
+            st.session_state["selected_device_mac"] = mac
+            st.switch_page("views/3_Device_Detail.py")
         
         csv_net = display_df.to_csv(index=False).encode('utf-8')
         st.download_button(label="📥 Download CSV", data=csv_net, file_name='network_devices.csv', mime='text/csv')
@@ -68,13 +69,12 @@ with tab2:
         bt_df = db.get_all_bt_devices(days=days_bt)
     
     if not bt_df.empty:
-        search_bt = st.text_input("Search Bluetooth Devices (MAC, Name):")
+        search_term = st.session_state.get("global_search", "").lower()
         
-        if search_bt:
-            search_bt = search_bt.lower()
+        if search_term:
             mask = (
-                bt_df['address'].str.lower().str.contains(search_bt, na=False) |
-                bt_df['name'].str.lower().str.contains(search_bt, na=False)
+                bt_df['address'].str.lower().str.contains(search_term, na=False) |
+                bt_df['name'].str.lower().str.contains(search_term, na=False)
             )
             display_bt_df = bt_df[mask].copy()
         else:
@@ -93,7 +93,18 @@ with tab2:
         display_bt_df['name_badge'] = display_bt_df['name'].apply(format_vendor)
         
         # Display with new column order
-        st.dataframe(display_bt_df[['address', 'name_badge', 'rssi', 'last_seen', 'is_known', 'manufacturer_data_hex', 'service_uuids']], width="stretch")
+        event_bt = st.dataframe(
+            display_bt_df[['address', 'name_badge', 'rssi', 'last_seen', 'is_known', 'manufacturer_data_hex', 'service_uuids']], 
+            width="stretch",
+            on_select="rerun",
+            selection_mode="single-row"
+        )
+        
+        if event_bt and len(event_bt.selection.rows) > 0:
+            selected_idx = event_bt.selection.rows[0]
+            mac = display_bt_df.iloc[selected_idx]['address']
+            st.session_state["selected_device_mac"] = mac
+            st.switch_page("views/3_Device_Detail.py")
         
         csv_bt = display_bt_df.to_csv(index=False).encode('utf-8')
         st.download_button(label="📥 Download CSV", data=csv_bt, file_name='bluetooth_devices.csv', mime='text/csv')

@@ -1,15 +1,6 @@
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
 import streamlit as st
 import pandas as pd
 from dashboard import db
-from auth import check_password
-
-st.set_page_config(page_title="Alerts - OverwatcherPI", layout="wide")
-if not check_password():
-    st.stop()
     
 st.title("🚨 Alerts & Events")
 
@@ -25,6 +16,14 @@ with col3:
 
 with st.spinner("Fetching alerts..."):
     events_df = db.get_events(limit=limit, category=category if category != "All" else None, grouped=grouped)
+
+search_term = st.session_state.get("global_search", "").lower()
+if not events_df.empty and search_term:
+    mask = (
+        events_df['message'].str.lower().str.contains(search_term, na=False) |
+        events_df['related_id'].str.lower().str.contains(search_term, na=False)
+    )
+    events_df = events_df[mask]
 
 def color_severity(val):
     if val in ['high', 'critical']:
