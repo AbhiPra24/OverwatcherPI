@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     sniffer_interface: str = ""
     trusted_dhcp_server: str = ""
     db_path: Path = Field(default=Path("data/netmon.db"))
+    dashboard_password: str = ""
+    db_retention_days: int = 90
     log_level: str = "INFO"
     log_file: Path = Field(default=Path("logs/overwatcher.log"))
     hourly_report_enabled: bool = True

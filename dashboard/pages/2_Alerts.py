@@ -5,8 +5,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import streamlit as st
 import pandas as pd
 from dashboard import db
+from auth import check_password
 
 st.set_page_config(page_title="Alerts - OverwatcherPI", layout="wide")
+if not check_password():
+    st.stop()
+    
 st.title("🚨 Alerts & Events")
 
 col1, col2 = st.columns(2)
@@ -15,7 +19,8 @@ with col1:
 with col2:
     limit = st.number_input("Event Limit", min_value=10, max_value=1000, value=200)
 
-events_df = db.get_events(limit=limit, category=category if category != "All" else None)
+with st.spinner("Fetching alerts..."):
+    events_df = db.get_events(limit=limit, category=category if category != "All" else None)
 
 if not events_df.empty:
     st.dataframe(
@@ -23,5 +28,8 @@ if not events_df.empty:
         width="stretch",
         hide_index=True
     )
+    
+    csv_events = events_df.to_csv(index=False).encode('utf-8')
+    st.download_button(label="📥 Download CSV", data=csv_events, file_name='alerts.csv', mime='text/csv')
 else:
     st.info("No events found.")

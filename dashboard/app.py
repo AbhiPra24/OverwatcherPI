@@ -6,8 +6,13 @@ import streamlit as st
 import pandas as pd
 from dashboard import db
 from utils import metrics
+from auth import check_password
+from datetime import datetime
 
 st.set_page_config(page_title="OverwatcherPI Dashboard", layout="wide")
+
+if not check_password():
+    st.stop()
 
 st.title("🛡 OverwatcherPI Live Overview")
 
@@ -17,20 +22,23 @@ def live_overview():
     
     with col1:
         st.subheader("Network")
-        net_df = db.get_active_network_devices()
+        with st.spinner("Fetching active network devices..."):
+            net_df = db.get_active_network_devices()
         st.metric("Active Network Devices", len(net_df))
         if not net_df.empty:
             st.dataframe(net_df[['ip', 'mac', 'vendor', 'hostname', 'is_known']], width="stretch")
             
     with col2:
         st.subheader("Bluetooth")
-        bt_df = db.get_active_bt_devices()
+        with st.spinner("Fetching active bluetooth devices..."):
+            bt_df = db.get_active_bt_devices()
         st.metric("Active Bluetooth Devices (Last 1hr)", len(bt_df))
         if not bt_df.empty:
             st.dataframe(bt_df[['address', 'name', 'rssi']], width="stretch")
 
     st.subheader("System Health")
-    health = metrics.get_system_status()
+    with st.spinner("Fetching system health..."):
+        health = metrics.get_system_status()
     h_col1, h_col2, h_col3, h_col4 = st.columns(4)
     cpu_percent = sum(health.cpu_per_core) / len(health.cpu_per_core) if health.cpu_per_core else 0
     mem_percent = (health.ram_used_mb / health.ram_total_mb * 100) if health.ram_total_mb else 0
@@ -42,11 +50,14 @@ def live_overview():
     
     if "Normal" not in health.throttling_status:
         st.warning(f"System Throttling Status: {health.throttling_status}")
+        
+    st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
 
 live_overview()
 
 st.subheader("Scan History (Last 7 Days)")
-hist_df = db.get_scan_history(days=7)
+with st.spinner("Fetching scan history..."):
+    hist_df = db.get_scan_history(days=7)
 if not hist_df.empty:
     st.line_chart(hist_df[['device_count']])
 else:

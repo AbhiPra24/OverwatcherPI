@@ -275,6 +275,15 @@ def setup_scheduler(app: Application) -> AsyncIOScheduler:
         id="identification_enrichment"
     )
     
+    # Schedule DB Retention Job (Daily at 3 AM)
+    scheduler.add_job(
+        db_retention_job,
+        "cron",
+        hour=3,
+        args=[app],
+        id="db_retention"
+    )
+    
     return scheduler
 
 async def port_drift_job(app: Application):
@@ -334,3 +343,20 @@ async def identification_enrichment_job(app: Application):
         await DatabaseManager.record_banner_grab_attempt(d.mac, resolved, hostname)
         if resolved:
             logger.info(f"Resolved unknown device {d.mac} to {hostname}")
+
+async def db_retention_job(app: Application):
+    """Daily job to prune old rows from unbounded tables (scan_history, events)."""
+    if config.db_retention_days <= 0:
+        return
+        
+    logger.info(f"Running DB retention job (keeping last {config.db_retention_days} days)...")
+    try:
+        db = await DatabaseManager.get_db()
+        cutoff = datetime.now().timestamp() - (config.db_retention_days * 86400)
+        
+        await db.execute("DELETE FROM scan_history WHERE scan_time < ?", (cutoff,))
+        await db.execute("DELETE FROM events WHERE timestamp < ?", (cutoff,))
+        await db.commit()
+        logger.info("DB retention job completed.")
+    except Exception as e:
+        logger.error(f"DB retention job failed: {e}")

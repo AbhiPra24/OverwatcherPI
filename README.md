@@ -93,13 +93,14 @@ The recommended deployment path is `/opt/OverwatcherPI/`.
    sudo systemctl enable --now overwatcher-sniffer
    ```
 
-4. **Running the Dashboard:**
-   To view the historical logs and alerts, use the provided scripts.
-   *(Make sure you run Step 6 of Installation first)*
+4. **Enable Dashboard Service:**
+   *(Make sure you run Step 6 of Installation first, and set a `DASHBOARD_PASSWORD` in `.env`)*
    ```bash
-   ./dashboard/start_dashboard.sh
-   # To stop: ./dashboard/stop_dashboard.sh
+   sudo cp /opt/OverwatcherPI/overwatcher-dashboard.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now overwatcher-dashboard
    ```
+   The dashboard will run on port `8109` and will auto-restart on crashes.
 
 ## Telegram Commands
 - `/status` — Get Raspberry Pi system health & throttling status
