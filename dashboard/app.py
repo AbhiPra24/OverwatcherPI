@@ -48,6 +48,6 @@ live_overview()
 st.subheader("Scan History (Last 7 Days)")
 hist_df = db.get_scan_history(days=7)
 if not hist_df.empty:
-    st.line_chart(hist_df[['device_count', 'known_devices', 'unknown_devices']])
+    st.line_chart(hist_df[['device_count']])
 else:
     st.info("No scan history available yet.")

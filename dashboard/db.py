@@ -28,9 +28,9 @@ def get_all_bt_devices() -> pd.DataFrame:
 def get_scan_history(days: int = 7) -> pd.DataFrame:
     cutoff = time.time() - (days * 86400)
     with get_connection() as conn:
-        df = pd.read_sql_query(f"SELECT timestamp, device_count, known_devices, unknown_devices FROM scan_history WHERE timestamp >= {cutoff} ORDER BY timestamp ASC", conn)
+        df = pd.read_sql_query(f"SELECT scan_time, device_count FROM scan_history WHERE scan_time >= {cutoff} ORDER BY scan_time ASC", conn)
         if not df.empty:
-            df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+            df['datetime'] = pd.to_datetime(df['scan_time'], unit='s')
             df.set_index('datetime', inplace=True)
         return df
 
