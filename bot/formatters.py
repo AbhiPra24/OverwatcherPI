@@ -78,7 +78,9 @@ def format_network(devices: List[NetworkDevice], new_macs: Set[str] = None) -> s
         lines.append(f"{icon} <b>{escape(dev.ip)}</b>  <code>{escape(dev.mac)}</code>")
         
         info_parts = []
-        if dev.hostname:
+        if dev.friendly_name:
+            info_parts.append(f"👤 <b>{escape(dev.friendly_name)}</b>")
+        elif dev.hostname:
             info_parts.append(f"<i>{escape(dev.hostname)}</i>")
             
         if dev.vendor == "Private (randomized)":

@@ -36,7 +36,8 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/attacker &lt;ip&gt; - WHOIS OSINT lookup\n"
         "/monitor &lt;ip&gt; - Pin host for ping monitor\n"
         "/unmonitor &lt;ip&gt; - Remove host from ping monitor\n"
-        "/dns &lt;ip&gt; - View recent DNS queries for host"
+        "/dns &lt;ip&gt; - View recent DNS queries for host\n"
+        "/name &lt;mac&gt; &lt;name&gt; - Assign friendly name to device"
     )
     await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
@@ -177,6 +178,23 @@ async def whitelist_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     success = await DatabaseManager.mark_known(mac)
     if success:
         await update.message.reply_text(f"✅ Whitelisted MAC: {mac}")
+    else:
+        await update.message.reply_text(f"⚠️ MAC {mac} not found in database.")
+
+@auth_required
+async def name_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args or len(context.args) < 2:
+        await update.message.reply_text("Usage: /name <mac> <friendly name>")
+        return
+    mac = context.args[0].upper()
+    if not re.match(r"^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$", mac):
+        await update.message.reply_text("❌ That doesn't look like a valid MAC address.")
+        return
+        
+    name = " ".join(context.args[1:])
+    success = await DatabaseManager.set_device_name(mac, name)
+    if success:
+        await update.message.reply_text(f"✅ Set name for {mac} to '{name}'")
     else:
         await update.message.reply_text(f"⚠️ MAC {mac} not found in database.")
 

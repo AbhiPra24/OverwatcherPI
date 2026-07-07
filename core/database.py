@@ -22,6 +22,9 @@ class NetworkDevice(BaseModel):
     raw_mdns_name: Optional[str] = None
     raw_ssdp_server: Optional[str] = None
     raw_netbios_name: Optional[str] = None
+    friendly_name: Optional[str] = None
+    device_type: Optional[str] = None
+    owner: Optional[str] = None
 
 
 class BLEDevice(BaseModel):
@@ -229,6 +232,10 @@ class DatabaseManager:
         if "banner_grab_attempted_at" not in cols:
             await db.execute("ALTER TABLE network_devices ADD COLUMN banner_grab_attempted_at REAL")
             await db.execute("ALTER TABLE network_devices ADD COLUMN banner_grab_attempts INTEGER DEFAULT 0")
+        if "friendly_name" not in cols:
+            await db.execute("ALTER TABLE network_devices ADD COLUMN friendly_name TEXT")
+            await db.execute("ALTER TABLE network_devices ADD COLUMN device_type TEXT")
+            await db.execute("ALTER TABLE network_devices ADD COLUMN owner TEXT")
             
         await db.execute("""
             CREATE TABLE IF NOT EXISTS job_heartbeats (
@@ -316,13 +323,23 @@ class DatabaseManager:
         """Get all currently active devices."""
         db = await cls.get_db()
         cursor = await db.execute("""
-            SELECT mac, ip, vendor, hostname 
+            SELECT mac, ip, vendor, hostname, friendly_name, device_type, owner 
             FROM network_devices 
             WHERE is_active = 1
             ORDER BY ip
         """)
         rows = await cursor.fetchall()
-        return [NetworkDevice(mac=r["mac"], ip=r["ip"], vendor=r["vendor"], hostname=r["hostname"]) for r in rows]
+        return [NetworkDevice(
+            mac=r["mac"], ip=r["ip"], vendor=r["vendor"], hostname=r["hostname"],
+            friendly_name=r["friendly_name"], device_type=r["device_type"], owner=r["owner"]
+        ) for r in rows]
+
+    @classmethod
+    async def set_device_name(cls, mac: str, name: str) -> bool:
+        db = await cls.get_db()
+        cur = await db.execute("UPDATE network_devices SET friendly_name = ? WHERE mac = ?", (name, mac))
+        await db.commit()
+        return cur.rowcount > 0
 
     @classmethod
     async def upsert_bt_devices(cls, devices: List[BLEDevice]) -> Set[str]:

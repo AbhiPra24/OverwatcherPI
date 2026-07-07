@@ -22,7 +22,8 @@ with tab1:
                 net_df['ip'].str.lower().str.contains(search_term, na=False) |
                 net_df['mac'].str.lower().str.contains(search_term, na=False) |
                 net_df['vendor'].str.lower().str.contains(search_term, na=False) |
-                net_df['hostname'].str.lower().str.contains(search_term, na=False)
+                net_df['hostname'].str.lower().str.contains(search_term, na=False) |
+                (net_df['friendly_name'].str.lower().str.contains(search_term, na=False) if 'friendly_name' in net_df.columns else False)
             )
             display_df = net_df[mask].copy()
         else:
@@ -41,9 +42,22 @@ with tab1:
                 
         display_df['vendor_badge'] = display_df['vendor'].apply(format_vendor)
         
+        
+        if 'friendly_name' not in display_df.columns:
+            display_df['friendly_name'] = None
+            
+        def format_name(row):
+            if pd.notna(row['friendly_name']) and row['friendly_name']:
+                return f"👤 {row['friendly_name']}"
+            elif pd.notna(row['hostname']) and row['hostname']:
+                return row['hostname']
+            return ""
+            
+        display_df['display_name'] = display_df.apply(format_name, axis=1)
+        
         # Display with new column order
         event = st.dataframe(
-            display_df[['ip', 'mac', 'vendor_badge', 'hostname', 'first_seen', 'last_seen', 'is_known', 'is_active']], 
+            display_df[['ip', 'mac', 'display_name', 'vendor_badge', 'first_seen', 'last_seen', 'is_known', 'is_active']], 
             width="stretch",
             on_select="rerun",
             selection_mode="single-row"

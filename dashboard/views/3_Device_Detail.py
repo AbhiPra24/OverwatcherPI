@@ -28,6 +28,7 @@ with col1:
     if not net_device.empty:
         d = net_device.iloc[0]
         st.write(f"**IP:** {d['ip']}")
+        st.write(f"**Friendly Name:** {d.get('friendly_name', 'N/A')}")
         st.write(f"**Vendor:** {d['vendor']}")
         st.write(f"**Hostname:** {d['hostname']}")
         st.write(f"**First Seen:** {pd.to_datetime(d['first_seen'], unit='s')}")
