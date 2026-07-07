@@ -17,6 +17,17 @@ External access goes through Caddy: `http://<pi-ip>:8109/api/devices` (protected
 
 > **Never change the uvicorn bind to `0.0.0.0`** without also adding firewall rules — doing so would expose the API directly on the LAN with only the Bearer token as protection.
 
+### Security Note: AppArmor & D-Bus
+
+In `docker-compose.yml`, you will notice `security_opt: [apparmor:unconfined]` on the `bot` container.
+**Why is this here?** Even with the host's `/var/run/dbus` socket mapped in, Docker's default AppArmor profile (`docker-default`) aggressively restricts D-Bus communications. When `bleak` attempts to listen for BLE advertisements, it sends an `AddMatch` method call to the host's BlueZ daemon. Without `apparmor:unconfined`, AppArmor silently intercepts and blocks this call (`[org.freedesktop.DBus.Error.AccessDenied]`), completely breaking BLE discovery.
+
+Because crafting a tailored, perfectly-scoped AppArmor profile for every user's specific host OS is out-of-scope for a portable Compose stack, we run the bot unconfined to ensure D-Bus passthrough works.
+
+**To mitigate the risk of running unconfined:**
+- The Dockerfile drops root privileges and runs the bot process as a dedicated non-root user (`overwatcher`, uid 1000).
+- Necessary privileged capabilities are granted surgically via `setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip` on the `nmap` binary during the image build, rather than granting the entire Python process these rights.
+
 ## Pre-flight Checklist
 
 1. Install Docker + Docker Compose plugin:

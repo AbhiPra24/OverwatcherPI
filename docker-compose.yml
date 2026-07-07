@@ -39,6 +39,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: overwatcher-sniffer
+    user: root
     command: python bin/sniffer_daemon.py
     network_mode: host          # required: must see real LAN ARP/DHCP traffic
     cap_add:
