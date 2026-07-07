@@ -16,6 +16,10 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - /var/run/dbus:/var/run/dbus  # BlueZ D-Bus passthrough (see docs/docker.md)
+      - /usr/bin/vcgencmd:/usr/bin/vcgencmd:ro  # Pi throttling/temp queries
+      - /var/log/auth.log:/var/log/auth.log:ro  # SSH watcher
+    devices:
+      - /dev/vcio:/dev/vcio  # required by vcgencmd
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c",
