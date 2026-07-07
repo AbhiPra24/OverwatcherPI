@@ -151,6 +151,13 @@ class DatabaseManager:
             )
         """)
         
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ble_alert_cooldown (
+                vendor_key TEXT PRIMARY KEY,
+                last_alert_at REAL NOT NULL
+            )
+        """)
+        
         await db.commit()
         
         # Add is_known column if it doesn't exist (schema migration)
@@ -518,3 +525,21 @@ class DatabaseManager:
             """, (current_time, mac))
             
         await db.commit()
+
+    @classmethod
+    async def should_alert_ble_vendor(cls, vendor_key: str, cooldown_hours: float) -> bool:
+        db = await cls.get_db()
+        current_time = time.time()
+        
+        cursor = await db.execute("SELECT last_alert_at FROM ble_alert_cooldown WHERE vendor_key = ?", (vendor_key,))
+        row = await cursor.fetchone()
+        
+        if row is None or (current_time - row["last_alert_at"]) >= (cooldown_hours * 3600):
+            await db.execute(
+                "INSERT INTO ble_alert_cooldown (vendor_key, last_alert_at) VALUES (?, ?) ON CONFLICT(vendor_key) DO UPDATE SET last_alert_at = excluded.last_alert_at",
+                (vendor_key, current_time)
+            )
+            await db.commit()
+            return True
+            
+        return False

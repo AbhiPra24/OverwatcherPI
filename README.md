@@ -93,14 +93,30 @@ The recommended deployment path is `/opt/OverwatcherPI/`.
    sudo systemctl enable --now overwatcher-sniffer
    ```
 
-4. **Enable Dashboard Service:**
-   *(Make sure you run Step 6 of Installation first, and set a `DASHBOARD_PASSWORD` in `.env`)*
+4. **Enable Dashboard Service (with Caddy Proxy):**
+   The dashboard runs strictly on localhost (`127.0.0.1:8501`). We use Caddy to securely expose it on port `8109` over your LAN using HTTP Basic Auth.
+   *(Make sure you run Step 6 of Installation first)*
+
+   First, generate a secure bcrypt password hash:
+   ```bash
+   caddy hash-password
+   ```
+   Edit `dashboard/Caddyfile` and replace `<bcrypt-hash-of-your-password>` with the generated hash.
+
+   Enable the Streamlit backend:
    ```bash
    sudo cp /opt/OverwatcherPI/overwatcher-dashboard.service /etc/systemd/system/
    sudo systemctl daemon-reload
    sudo systemctl enable --now overwatcher-dashboard
    ```
-   The dashboard will run on port `8109` and will auto-restart on crashes.
+   
+   Start the Caddy reverse proxy:
+   ```bash
+   cd /opt/OverwatcherPI/dashboard
+   caddy start --config Caddyfile
+   ```
+   The dashboard will now be reachable on port `8109` from your LAN, protected by Caddy's Basic Auth. 
+   *(Optional: You can also set `DASHBOARD_PASSWORD` in `.env` for a secondary in-app authentication layer, or leave it blank to rely entirely on Caddy).*
 
 ## Telegram Commands
 - `/status` — Get Raspberry Pi system health & throttling status

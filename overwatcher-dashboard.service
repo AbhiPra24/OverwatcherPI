@@ -7,7 +7,7 @@ Type=simple
 User=abhipra
 WorkingDirectory=/home/abhipra/Work/OverwatcherPI
 Environment="PATH=/home/abhipra/Work/OverwatcherPI/dashboard/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=/home/abhipra/Work/OverwatcherPI/dashboard/venv/bin/streamlit run /home/abhipra/Work/OverwatcherPI/dashboard/app.py --server.address 0.0.0.0 --server.port 8109 --server.headless true
+ExecStart=/home/abhipra/Work/OverwatcherPI/dashboard/venv/bin/streamlit run /home/abhipra/Work/OverwatcherPI/dashboard/app.py --server.address 127.0.0.1 --server.port 8501 --server.headless true
 Restart=always
 RestartSec=5
 StandardOutput=append:/home/abhipra/Work/OverwatcherPI/dashboard/dashboard.log

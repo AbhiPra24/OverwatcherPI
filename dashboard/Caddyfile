@@ -1,0 +1,8 @@
+:8109 {
+    # Provide the bcrypt hash of your desired password.
+    # Generate it using: caddy hash-password
+    basicauth {
+        admin <bcrypt-hash-of-your-password>
+    }
+    reverse_proxy 127.0.0.1:8501
+}

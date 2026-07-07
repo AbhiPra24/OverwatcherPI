@@ -83,19 +83,25 @@ async def fast_sweep_job(app: Application):
         if not is_known:
             name = next((d.name for d in bt_devices if d.address == mac), "Unknown")
             try:
-                await app.bot.send_message(
-                    chat_id=config.telegram_owner_id,
-                    text=f"🚨 <b>Unknown Bluetooth device detected:</b> {name} (MAC: <code>{mac}</code>)",
-                    parse_mode=ParseMode.HTML
-                )
                 await DatabaseManager.log_event(
                     category="bluetooth",
                     severity="warning",
                     message=f"Unknown Bluetooth device detected: {name}",
                     related_id=mac
                 )
+                
+                should_alert = True
+                if name and name != "Unknown":
+                    should_alert = await DatabaseManager.should_alert_ble_vendor(name, config.ble_alert_cooldown_hours)
+                    
+                if should_alert:
+                    await app.bot.send_message(
+                        chat_id=config.telegram_owner_id,
+                        text=f"🚨 <b>Unknown Bluetooth device detected:</b> {name} (MAC: <code>{mac}</code>)",
+                        parse_mode=ParseMode.HTML
+                    )
             except Exception as e:
-                logger.error(f"Failed to send alert: {e}")
+                logger.error(f"Failed to process BLE alert: {e}")
     
 async def hourly_report_job(app: Application):
     """Background job to send the aggregated hourly trend report."""
