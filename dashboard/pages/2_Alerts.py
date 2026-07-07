@@ -20,7 +20,7 @@ events_df = db.get_events(limit=limit, category=category if category != "All" el
 if not events_df.empty:
     st.dataframe(
         events_df[['datetime', 'category', 'severity', 'message', 'related_id']], 
-        use_container_width=True,
+        width="stretch",
         hide_index=True
     )
 else:

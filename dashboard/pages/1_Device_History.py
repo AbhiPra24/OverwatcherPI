@@ -33,7 +33,7 @@ with tab1:
         display_df['first_seen'] = pd.to_datetime(display_df['first_seen'], unit='s')
         display_df['last_seen'] = pd.to_datetime(display_df['last_seen'], unit='s')
         
-        st.dataframe(display_df, use_container_width=True)
+        st.dataframe(display_df, width="stretch")
     else:
         st.info("No network devices found.")
 
@@ -56,6 +56,6 @@ with tab2:
             
         display_bt_df['last_seen'] = pd.to_datetime(display_bt_df['last_seen'], unit='s')
         
-        st.dataframe(display_bt_df, use_container_width=True)
+        st.dataframe(display_bt_df, width="stretch")
     else:
         st.info("No bluetooth devices found.")

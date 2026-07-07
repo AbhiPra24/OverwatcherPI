@@ -20,26 +20,28 @@ def live_overview():
         net_df = db.get_active_network_devices()
         st.metric("Active Network Devices", len(net_df))
         if not net_df.empty:
-            st.dataframe(net_df[['ip', 'mac', 'vendor', 'hostname', 'is_known']], use_container_width=True)
+            st.dataframe(net_df[['ip', 'mac', 'vendor', 'hostname', 'is_known']], width="stretch")
             
     with col2:
         st.subheader("Bluetooth")
         bt_df = db.get_active_bt_devices()
         st.metric("Active Bluetooth Devices (Last 1hr)", len(bt_df))
         if not bt_df.empty:
-            st.dataframe(bt_df[['address', 'name', 'rssi']], use_container_width=True)
+            st.dataframe(bt_df[['address', 'name', 'rssi']], width="stretch")
 
     st.subheader("System Health")
     health = metrics.get_system_status()
     h_col1, h_col2, h_col3, h_col4 = st.columns(4)
-    h_col1.metric("CPU Usage", f"{health.get('cpu_percent', 0)}%")
-    h_col2.metric("CPU Temp", f"{health.get('cpu_temp', 0)}°C")
-    h_col3.metric("Memory", f"{health.get('memory_percent', 0)}%")
-    h_col4.metric("Disk", f"{health.get('disk_percent', 0)}%")
+    cpu_percent = sum(health.cpu_per_core) / len(health.cpu_per_core) if health.cpu_per_core else 0
+    mem_percent = (health.ram_used_mb / health.ram_total_mb * 100) if health.ram_total_mb else 0
     
-    throttling = metrics.get_throttling_status()
-    if throttling and throttling.get('throttled_now', False):
-        st.warning("System is currently thermal throttling!")
+    h_col1.metric("CPU Usage", f"{cpu_percent:.1f}%")
+    h_col2.metric("CPU Temp", f"{health.temp_celsius:.1f}°C")
+    h_col3.metric("Memory", f"{mem_percent:.1f}%")
+    h_col4.metric("Disk", f"{health.disk_percent:.1f}%")
+    
+    if "Normal" not in health.throttling_status:
+        st.warning(f"System Throttling Status: {health.throttling_status}")
 
 live_overview()
 
