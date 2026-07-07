@@ -562,3 +562,13 @@ class DatabaseManager:
             (time.time(), target, loss_pct, jitter_ms)
         )
         await db.commit()
+
+    @classmethod
+    async def cache_oui_entry(cls, prefix: str, vendor: str):
+        await cls.bulk_insert_oui([(prefix, vendor)])
+
+    @classmethod
+    async def update_device_vendor(cls, mac: str, vendor: str):
+        db = await cls.get_db()
+        await db.execute("UPDATE network_devices SET vendor = ? WHERE mac = ?", (vendor, mac))
+        await db.commit()

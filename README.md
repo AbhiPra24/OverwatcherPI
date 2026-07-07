@@ -6,6 +6,7 @@ A fully async, modular, open-source daemon that streams telemetry to a secure Te
 - **Network Surveillance:** Fast `nmap` based ARP sweeps of the local subnet, enhanced with `zeroconf` mDNS discovery.
 - **BLE Discovery:** Async Bluetooth Low Energy scanning via `bleak`.
 - **Differential Tracking:** Automatically diffs current topology against baseline and flags new devices.
+- **Device Identification:** Uses an offline IEEE OUI database bulk cache with a live API fallback (macvendors.com) for unknown network prefixes to improve identification speed.
 - **Intruder Defense:** Runs targeted `nmap -sV` port scans on unknown devices before alerting you.
 - **Port Drift Tracking:** Scans known devices daily to detect and alert on newly opened ports.
 - **Ping Monitor:** Pin critical infrastructure hosts for constant 1-minute uptime checks.
@@ -132,3 +133,4 @@ The recommended deployment path is `/opt/OverwatcherPI/`.
 ## Known Limitations
 - **BLE Tracking:** iOS/Android BLE addresses rotate roughly every 15 minutes by design. Devices never paired/bonded with this Pi cannot be reliably tracked or identified long-term — that's BLE privacy working as intended, not a bug.
 - **Passive Sniffer:** On a switched (non-hub) network, the passive sniffer can only reliably see broadcast ARP/DHCP traffic and unicast traffic addressed directly to/from the Pi itself. Additionally, if the Pi is WiFi-only, running the passive sniffer continuously on the WiFi interface can affect stability on some chipsets (like the Pi's onboard Broadcom WiFi). To mitigate this, point `SNIFFER_INTERFACE` at a wired interface if one exists, or leave it blank to disable the feature entirely.
+- **Live OUI Identification:** The `macvendors.com` live fallback sends the first 3 bytes (the OUI prefix) of unknown, non-randomized network MAC addresses to a third-party API. The full MAC is never sent. This can be fully disabled by setting `MACVENDORS_API_ENABLED=false` in your `.env`.

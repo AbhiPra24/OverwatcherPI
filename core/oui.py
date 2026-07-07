@@ -80,3 +80,28 @@ async def get_vendor(mac: str) -> str:
         vendor = await DatabaseManager.lookup_oui(prefix)
         return vendor if vendor else "Unknown"
     return "Unknown"
+
+async def live_lookup_vendor(prefix: str):
+    """Live fallback to api.macvendors.com for unknown network prefixes."""
+    url = f"https://api.macvendors.com/{prefix}"
+    try:
+        from config import config
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=config.macvendors_api_timeout)) as response:
+                if response.status == 200:
+                    text = await response.text(encoding="utf-8")
+                    return text.strip()
+                elif response.status == 404:
+                    return None
+                elif response.status == 429:
+                    logger.warning(f"macvendors.com rate limited on prefix {prefix}")
+                    return None
+                else:
+                    logger.debug(f"macvendors.com returned HTTP {response.status} for {prefix}")
+                    return None
+    except asyncio.TimeoutError:
+        logger.debug(f"Timeout querying macvendors.com for {prefix}")
+        return None
+    except Exception as e:
+        logger.debug(f"Exception querying macvendors.com for {prefix}: {e}")
+        return None

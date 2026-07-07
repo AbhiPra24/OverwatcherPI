@@ -346,8 +346,29 @@ async def identification_enrichment_job(app: Application):
     
     if not devices:
         return
-        
     for d in devices:
+        resolved = False
+        hostname = ""
+        
+        # 1. Try Live OUI Lookup First
+        if config.macvendors_api_enabled:
+            clean_mac = d.mac.replace(":", "").replace("-", "").upper()
+            if len(clean_mac) >= 6:
+                prefix = clean_mac[:6]
+                vendor = await oui.live_lookup_vendor(prefix)
+                if vendor:
+                    # Cache it and update the device directly
+                    await DatabaseManager.cache_oui_entry(prefix, vendor)
+                    await DatabaseManager.update_device_vendor(d.mac, vendor)
+                    
+                    # Log attempt but skip the heavier banner grab
+                    await DatabaseManager.record_banner_grab_attempt(d.mac, True, "")
+                    logger.info(f"Resolved unknown device {d.mac} via live OUI API to {vendor}")
+                    await asyncio.sleep(0.5)
+                    continue
+            await asyncio.sleep(0.5)
+                    
+        # 2. Fall back to Banner Grab
         hostname = await network.grab_banner(d.ip)
         resolved = bool(hostname)
         await DatabaseManager.record_banner_grab_attempt(d.mac, resolved, hostname)

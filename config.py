@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_file: Path = Field(default=Path("logs/overwatcher.log"))
     hourly_report_enabled: bool = True
+    macvendors_api_enabled: bool = True
+    macvendors_api_timeout: float = 5.0
     ble_scan_timeout: float = 10.0
     ble_alert_cooldown_hours: float = 2.0
     ble_adapter: str = "hci0"
