@@ -1,3 +1,5 @@
 streamlit>=1.37
 pandas
 psutil
+pydantic
+pydantic-settings
