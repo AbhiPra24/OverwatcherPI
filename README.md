@@ -1,136 +1,256 @@
 # OverwatcherPI
 
-A fully async, modular, open-source daemon that streams telemetry to a secure Telegram Bot. It performs differential network surveillance, BLE discovery, and hourly trend analytics. Designed for Raspberry Pi 5 (8 GB RAM), Linux.
+> A fully async, modular, open-source network surveillance daemon for Raspberry Pi — streams real-time telemetry to a secure Telegram Bot, runs a web dashboard, and now ships as a full Docker Compose stack.
+
+---
+
+## Architecture & Data Flow
+
+```mermaid
+flowchart TD
+    subgraph HOST["🖥️ Raspberry Pi Host"]
+        BT["BlueZ / hci0\nBluetooth Adapter"]
+        NIC["Network Interface\neth0 / wlan0"]
+        DBUS["/var/run/dbus\nD-Bus Socket"]
+        AUTHLOG["/var/log/auth.log"]
+    end
+
+    subgraph DOCKER["🐳 Docker Compose Stack"]
+
+        subgraph BOT["overwatcher-bot  [network_mode: host]"]
+            NMAP["🔍 Network Scanner\nnmap ARP sweep + zeroconf mDNS"]
+            BLE["📡 BLE Scanner\nbleak via D-Bus passthrough"]
+            SCHED["⏱️ APScheduler\nfast_sweep · hourly_report\nport_drift · latency · speedtest\ndeferred_scan"]
+            API["🌐 FastAPI :8000\nGET /api/devices\n(Bearer token auth)"]
+            TGBOT["🤖 Telegram Bot\npolling"]
+        end
+
+        subgraph SNIFFER["overwatcher-sniffer  [network_mode: host]"]
+            SCAPY["📦 Scapy Passive Sniffer\nARP spoof detection\nRogue DHCP detection"]
+        end
+
+        subgraph DASH["overwatcher-dashboard  [bridge: internal]"]
+            STREAMLIT["📊 Streamlit Dashboard\nOverview · Device History\nAlerts · Security Posture\nTrends · Port History"]
+        end
+
+        subgraph PROXY["overwatcher-caddy  [bridge: internal]"]
+            CADDY["🔒 Caddy Reverse Proxy\n:8109 → dashboard:8501\nBasic Auth"]
+        end
+
+        DB[("🗄️ SQLite DB\nnetmon.db\n─────────────\nnetwork_devices\nbt_devices\nevents\ndevice_ports\nport_history\nlatency_samples\nscan_history\njob_heartbeats\ndeferred_scans")]
+    end
+
+    subgraph EXTERNAL["☁️ External"]
+        TG["Telegram API\napi.telegram.org"]
+        OUI["IEEE OUI DB\nstandards-oui.ieee.org"]
+        MV["macvendors.com\nVendor Lookup API"]
+    end
+
+    %% Host → Bot
+    NIC -->|"ARP · mDNS"| NMAP
+    BT -->|"HCI events"| DBUS
+    DBUS -->|"D-Bus passthrough"| BLE
+    AUTHLOG -->|"tail -F"| BOT
+
+    %% Host → Sniffer
+    NIC -->|"raw packets\n(ARP / DHCP)"| SCAPY
+
+    %% Bot internals
+    NMAP --> SCHED
+    BLE --> SCHED
+    SCHED --> DB
+    SCAPY --> DB
+    TGBOT --> SCHED
+
+    %% DB → Dashboard
+    DB -->|"read-only bind mount"| STREAMLIT
+
+    %% Dashboard → Caddy → User
+    STREAMLIT -->|"internal network"| CADDY
+
+    %% Bot ↔ Telegram
+    TGBOT <-->|"HTTPS polling"| TG
+    SCHED -->|"alerts"| TG
+
+    %% External enrichment
+    NMAP -->|"OUI bulk cache"| OUI
+    NMAP -->|"unknown MACs"| MV
+
+    %% API
+    API -->|"reads"| DB
+
+    classDef container fill:#1e3a5f,stroke:#4a9eff,color:#fff
+    classDef db fill:#2d4a1e,stroke:#6abf4b,color:#fff
+    classDef host fill:#3a1f1f,stroke:#cc4444,color:#fff
+    classDef external fill:#2d2040,stroke:#9b6eff,color:#fff
+    class BOT,SNIFFER,DASH,PROXY container
+    class DB db
+    class HOST host
+    class EXTERNAL external
+```
+
+---
 
 ## Features
-- **Network Surveillance:** Fast `nmap` based ARP sweeps of the local subnet, enhanced with `zeroconf` mDNS discovery.
-- **BLE Discovery:** Async Bluetooth Low Energy scanning via `bleak`.
-- **Differential Tracking:** Automatically diffs current topology against baseline and flags new devices.
-- **Device Identification:** Uses an offline IEEE OUI database bulk cache with a live API fallback (macvendors.com) for unknown network prefixes to improve identification speed.
-- **Intruder Defense:** Runs targeted `nmap -sV` port scans on unknown devices before alerting you.
-- **Port Drift Tracking:** Scans known devices daily to detect and alert on newly opened ports.
-- **Ping Monitor:** Pin critical infrastructure hosts for constant 1-minute uptime checks.
-- **Latency & Quality Monitoring:** Continuously tracks gateway and WAN ping jitter and loss.
-- **SSH Auth Monitoring:** Actively tails `/var/log/auth.log` for brute-force attacks and successful logins.
-- **Passive Sniffer:** Separate unprivileged daemon tracking rogue DHCP servers and ARP spoofing conflicts.
-- **Web Dashboard:** Read-only Streamlit dashboard for historical topology, device search, and event logging over your LAN.
-- **System Diagnostics:** Reports Pi CPU, RAM, Disk, SoC temperature, and checks for under-voltage/throttling events.
 
-## Hardware & OS Requirements
-- Raspberry Pi (optimized for Pi 5 8GB)
-- Linux OS (Raspberry Pi OS Bookworm or similar)
-- Python 3.10+
-- `nmap` and `samba-common-bin` installed globally (`sudo apt install nmap samba-common-bin`)
+### 🔍 Network Intelligence
+- **Fast ARP Sweeps** — `nmap`-based host discovery every 5 min, enhanced with `zeroconf` mDNS
+- **Intelligent Nmap Scheduler** — defers heavy `-sV` port scans during high network jitter; runs them during quiet hours (1–5 AM by default)
+- **Differential Tracking** — diffs topology against baseline, flags new/disappeared devices instantly
+- **Port Drift Detection** — daily `-sV` scans on known devices; alerts on newly opened ports with full historical time-series in the dashboard
+- **Device Identification** — offline IEEE OUI bulk cache + live `macvendors.com` fallback (OUI prefix only, never full MAC)
 
-## Installation
+### 📡 Bluetooth / BLE
+- **BLE Discovery** — async scanning via `bleak` / BlueZ
+- **Payload Fingerprinting** — SHA-256 fingerprint of service UUIDs + manufacturer data + bucketed TX power; suppresses duplicate alerts for 24h
+- **Proximity Zones** — classifies devices as Immediate / Near / Far based on RSSI
 
-1. **Clone the Repository:**
+### 🛡️ Security Monitoring
+- **ARP Spoof Detection** — passive Scapy sniffer watching for conflicting MAC↔IP bindings
+- **Rogue DHCP Detection** — flags unexpected DHCP servers; validates `subnet_mask` and `router` fields against trusted config
+- **SSH Brute-Force Monitoring** — tails `/var/log/auth.log` for repeated failures and successful logins from unknown IPs
+
+### 📊 Observability
+- **Latency & Jitter Monitoring** — continuous ping to gateway + WAN; data stored for trend graphs
+- **Speedtest** — periodic internet bandwidth measurement (configurable interval)
+- **System Health** — CPU, RAM, disk, SoC temperature, under-voltage / throttling detection
+- **Service Watchdog** — monitors sibling Docker/systemd services; alerts if one goes down
+- **Resource Alerts** — configurable CPU/RAM/disk thresholds with cooldown periods
+- **Job Heartbeats** — every scheduled job records its last run time; used as Docker healthcheck source
+
+### 🌐 Interfaces
+- **Telegram Bot** — real-time alerts + on-demand commands
+- **Streamlit Dashboard** — LAN-accessible; device history, security posture, trends, port history, event log
+- **FastAPI REST endpoint** — `GET /api/devices` with Bearer token auth for external integrations
+- **Caddy Reverse Proxy** — HTTPS-grade Basic Auth protecting the dashboard; never exposes Streamlit directly
+
+---
+
+## Telegram Commands
+
+| Command | Description |
+|---------|-------------|
+| `/status` | Raspberry Pi system health, temperature & throttling |
+| `/network` | Trigger immediate subnet ARP sweep |
+| `/bluetooth` | Trigger 10-second BLE discovery |
+| `/speedtest` | Run internet speed test |
+| `/traceroute <host>` | On-demand traceroute |
+| `/attacker <ip>` | WHOIS / OSINT lookup on an IP |
+| `/whitelist <mac>` | Mark a device as known/safe |
+| `/monitor <ip>` | Add host to 1-minute uptime ping monitor |
+| `/unmonitor <ip>` | Remove host from ping monitor |
+
+---
+
+## Deployment
+
+### 🐳 Docker (Recommended)
+
+**Pre-flight:**
+```bash
+# 1. Configure .env
+cp .env.example .env
+nano .env   # set TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_IDS, SNIFFER_INTERFACE, API_TOKEN
+
+# 2. Generate Caddy password hash
+docker run --rm caddy:2-alpine caddy hash-password
+# Paste the output into dashboard/Caddyfile
+```
+
+**Start:**
+```bash
+docker compose build
+docker compose up -d
+docker compose logs -f   # watch startup
+```
+
+All 4 services will come up:
+
+| Service | Network | Port |
+|---------|---------|------|
+| `overwatcher-bot` | `host` | — |
+| `overwatcher-sniffer` | `host` | — |
+| `overwatcher-dashboard` | bridge (internal) | not published |
+| `overwatcher-caddy` | bridge (internal) | **8109** (public) |
+
+Dashboard: `http://<pi-ip>:8109/`
+
+See [`docs/docker.md`](docs/docker.md) for the full migration guide, healthcheck details, and rollback instructions.
+
+---
+
+### 🔧 Manual / systemd (Legacy)
+
+<details>
+<summary>Expand legacy installation steps</summary>
+
+1. **Clone & venv:**
    ```bash
-   git clone https://github.com/yourusername/OverwatcherPI.git
-   cd OverwatcherPI
-   ```
-
-2. **Virtual Environment:**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
+   git clone https://github.com/AbhiPra24/OverwatcherPI.git && cd OverwatcherPI
+   python3 -m venv venv && source venv/bin/activate
    pip install -r requirements.txt
    ```
 
-3. **Bluetooth Permissions (Crucial for BLE):**
-   To allow the bot to query BlueZ without running as root, add your user to the bluetooth group:
+2. **Permissions:**
    ```bash
    sudo usermod -aG bluetooth $USER
-   ```
-   *(You may need to log out and back in for this to take effect).*
-
-4. **Nmap Permissions (Crucial for Network Sweeps):**
-   To allow nmap to run privileged scans without root access, grant it raw socket capabilities:
-   ```bash
    sudo setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip $(which nmap)
    ```
 
-5. **Configuration:**
+3. **Configure:**
    ```bash
-   cp .env.example .env
-   # Edit .env and provide your Telegram Bot Token and your Telegram User ID
-   nano .env
+   cp .env.example .env && nano .env
    ```
 
-6. **Dashboard Setup:**
-   The Streamlit dashboard requires a separate virtual environment to avoid dependency conflicts:
+4. **Dashboard venv:**
    ```bash
    python3 -m venv dashboard/venv
    source dashboard/venv/bin/activate
    pip install -r dashboard/requirements-dashboard.txt
    ```
 
-## Running Locally (Development)
-```bash
-source venv/bin/activate
-python main.py
-```
-
-## Production Deployment
-The recommended deployment path is `/opt/OverwatcherPI/`.
-
-1. **Copy to /opt:**
+5. **Enable services:**
    ```bash
-   sudo cp -r /home/abhipra/Work/OverwatcherPI /opt/
-   sudo chown -R your_username:your_username /opt/OverwatcherPI
-   ```
-
-2. **Enable Main Service:**
-   ```bash
-   sudo cp /opt/OverwatcherPI/overwatcher.service /etc/systemd/system/
+   sudo cp overwatcher.service /etc/systemd/system/
+   sudo cp overwatcher-sniffer.service /etc/systemd/system/
+   sudo cp overwatcher-dashboard.service /etc/systemd/system/
+   sudo cp overwatcher-caddy.service /etc/systemd/system/
    sudo systemctl daemon-reload
-   sudo systemctl enable --now overwatcher
+   sudo systemctl enable --now overwatcher overwatcher-sniffer overwatcher-dashboard overwatcher-caddy
    ```
 
-3. **Enable Passive Sniffer Service (Optional):**
-   ```bash
-   sudo ln -s /opt/OverwatcherPI/overwatcher-sniffer.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now overwatcher-sniffer
-   ```
+</details>
 
-4. **Enable Dashboard Service (with Caddy Proxy):**
-   The dashboard runs strictly on localhost (`127.0.0.1:8501`). We use Caddy to securely expose it on port `8109` over your LAN using HTTP Basic Auth.
-   *(Make sure you run Step 6 of Installation first)*
+---
 
-   First, generate a secure bcrypt password hash:
-   ```bash
-   caddy hash-password
-   ```
-   Edit `dashboard/Caddyfile` and replace `<bcrypt-hash-of-your-password>` with the generated hash.
+## Configuration (`.env`)
 
-   Enable the Streamlit backend:
-   ```bash
-   sudo cp /opt/OverwatcherPI/overwatcher-dashboard.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now overwatcher-dashboard
-   ```
-   
-   Start the Caddy reverse proxy:
-   ```bash
-   cd /opt/OverwatcherPI/dashboard
-   caddy start --config Caddyfile
-   ```
-   The dashboard will now be reachable on port `8109` from your LAN, protected by Caddy's Basic Auth. 
-   *(Optional: You can also set `DASHBOARD_PASSWORD` in `.env` for a secondary in-app authentication layer, or leave it blank to rely entirely on Caddy).*
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TELEGRAM_BOT_TOKEN` | *(required)* | Bot token from @BotFather |
+| `TELEGRAM_OWNER_IDS` | *(required)* | Comma-separated Telegram user IDs |
+| `SCAN_SUBNET` | `192.168.1.0/24` | Subnet to sweep |
+| `GATEWAY_IP` | `192.168.1.1` | Gateway for latency monitoring |
+| `SNIFFER_INTERFACE` | *(required for sniffer)* | e.g. `eth0` |
+| `TRUSTED_DHCP_SERVER` | *(empty)* | Expected DHCP server IP |
+| `SWEEP_INTERVAL_MINUTES` | `5` | Fast sweep frequency |
+| `QUIET_HOURS_START` | `1` | Hour to begin deferred scan window |
+| `QUIET_HOURS_END` | `5` | Hour to end deferred scan window |
+| `NETWORK_JITTER_THRESHOLD_MS` | `50.0` | Jitter above which full nmap is deferred |
+| `API_TOKEN` | *(set this!)* | Bearer token for `/api/devices` |
+| `API_PORT` | `8000` | FastAPI port |
+| `LOG_FORMAT` | `text` | `text` or `json` (for jq-able logs) |
+| `WATCHED_SERVICES` | `["overwatcher-dashboard","overwatcher-caddy","overwatcher-sniffer"]` | Services to health-monitor |
+| `CPU_WARN_PERCENT` | `85.0` | CPU alert threshold |
+| `RAM_WARN_PERCENT` | `85.0` | RAM alert threshold |
+| `DISK_WARN_PERCENT` | `90.0` | Disk alert threshold |
+| `MACVENDORS_API_ENABLED` | `true` | Disable to prevent OUI prefix sends |
 
-## Telegram Commands
-- `/status` — Get Raspberry Pi system health & throttling status
-- `/network` — Trigger immediate local subnet sweep
-- `/bluetooth` — Trigger immediate 10-second BLE discovery
-- `/speedtest` — Run internet speed test
-- `/traceroute <host>` — Run an on-demand traceroute
-- `/attacker <ip>` — Run WHOIS OSINT lookup on an IP
-- `/whitelist <mac>` — Mark a device MAC as safe
-- `/monitor <ip>` — Pin a critical host for 1-minute downtime checks
-- `/unmonitor <ip>` — Remove a host from ping monitor
+---
 
 ## Known Limitations
-- **BLE Tracking:** iOS/Android BLE addresses rotate roughly every 15 minutes by design. Devices never paired/bonded with this Pi cannot be reliably tracked or identified long-term — that's BLE privacy working as intended, not a bug.
-- **Passive Sniffer:** On a switched (non-hub) network, the passive sniffer can only reliably see broadcast ARP/DHCP traffic and unicast traffic addressed directly to/from the Pi itself. Additionally, if the Pi is WiFi-only, running the passive sniffer continuously on the WiFi interface can affect stability on some chipsets (like the Pi's onboard Broadcom WiFi). To mitigate this, point `SNIFFER_INTERFACE` at a wired interface if one exists, or leave it blank to disable the feature entirely.
-- **Live OUI Identification:** The `macvendors.com` live fallback sends the first 3 bytes (the OUI prefix) of unknown, non-randomized network MAC addresses to a third-party API. The full MAC is never sent. This can be fully disabled by setting `MACVENDORS_API_ENABLED=false` in your `.env`.
+
+- **BLE Privacy:** iOS/Android rotate BLE MAC addresses every ~15 min. Payload fingerprinting mitigates this for alert deduplication, but long-term device identity tracking is not possible by design.
+- **Passive Sniffer on WiFi:** On switched networks, the sniffer only sees broadcast ARP/DHCP. On some Pi WiFi chipsets, continuous promiscuous-mode sniffing can affect stability — use a wired `SNIFFER_INTERFACE` where possible.
+- **OUI Lookup Privacy:** The `macvendors.com` fallback sends only the 3-byte OUI prefix (never the full MAC). Set `MACVENDORS_API_ENABLED=false` to disable entirely.
+- **BLE under Docker:** D-Bus passthrough (`/var/run/dbus:/var/run/dbus`) is functional but sensitive to BlueZ/Docker version combinations. If BLE stops working post-migration, see the fallback option in [`docs/docker.md`](docs/docker.md).
