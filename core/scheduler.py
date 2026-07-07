@@ -380,6 +380,16 @@ def setup_scheduler(app: Application) -> AsyncIOScheduler:
         id="oui_refresh"
     )
     
+    # Schedule DNS Blocklist refresh (weekly)
+    from core import dns_blocklist
+    scheduler.add_job(
+        dns_blocklist.load_or_refresh,
+        "interval",
+        hours=168,
+        args=[True],  # force=True
+        id="dns_blocklist_refresh"
+    )
+    
     # Schedule speedtest
     scheduler.add_job(
         scheduled_speedtest_job,
@@ -595,17 +605,24 @@ async def identification_enrichment_job(app: Application):
     await DatabaseManager.record_scan_heartbeat("identification_enrichment")
 
 async def db_retention_job(app: Application):
-    """Daily job to prune old rows from unbounded tables (scan_history, events)."""
-    if config.db_retention_days <= 0:
+    """Daily job to prune old rows from unbounded tables (scan_history, events, dns_queries)."""
+    if config.db_retention_days <= 0 and config.dns_retention_days <= 0:
         return
         
-    logger.info(f"Running DB retention job (keeping last {config.db_retention_days} days)...")
+    logger.info("Running DB retention job...")
     try:
         db = await DatabaseManager.get_db()
-        cutoff = datetime.now().timestamp() - (config.db_retention_days * 86400)
+        current_time = datetime.now().timestamp()
         
-        await db.execute("DELETE FROM scan_history WHERE scan_time < ?", (cutoff,))
-        await db.execute("DELETE FROM events WHERE timestamp < ?", (cutoff,))
+        if config.db_retention_days > 0:
+            cutoff = current_time - (config.db_retention_days * 86400)
+            await db.execute("DELETE FROM scan_history WHERE scan_time < ?", (cutoff,))
+            await db.execute("DELETE FROM events WHERE timestamp < ?", (cutoff,))
+            
+        if config.dns_retention_days > 0:
+            dns_cutoff = current_time - (config.dns_retention_days * 86400)
+            await db.execute("DELETE FROM dns_queries WHERE timestamp < ?", (dns_cutoff,))
+            
         await db.commit()
         logger.info("DB retention job completed.")
         await DatabaseManager.record_scan_heartbeat("db_retention")

@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     dashboard_password: str = ""
     db_retention_days: int = 90
     db_backup_retention_days: int = 30
+    dns_retention_days: int = 14
+    dns_blocklist_enabled: bool = False
     log_level: str = "INFO"
     log_format: str = "text"
     log_file: Path = Field(default=Path("logs/overwatcher.log"))
@@ -55,6 +57,16 @@ class Settings(BaseSettings):
     network_jitter_threshold_ms: float = 50.0
     api_token: str
     api_port: int = 8000
+    honeypot_enabled: bool = False
+    honeypot_ports: List[int] = [2323, 8445, 8389]
+
+    @field_validator("honeypot_ports", mode="after")
+    def validate_honeypot_ports(cls, v):
+        restricted = {8501, 8109, 8000, 22}
+        for port in v:
+            if port in restricted:
+                raise ValueError(f"Honeypot port {port} collides with a restricted service port (8501, 8109, 8000, 22).")
+        return v
 
     @field_validator("watched_services", mode="before")
     def parse_watched_services(cls, v):

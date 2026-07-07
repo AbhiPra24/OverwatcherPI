@@ -105,6 +105,18 @@ class DatabaseManager:
         """)
         
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS dns_queries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp REAL NOT NULL,
+                src_ip TEXT NOT NULL,
+                query_name TEXT NOT NULL,
+                query_type TEXT
+            )
+        """)
+        
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_dns_queries_src_ts ON dns_queries(src_ip, timestamp)")
+        
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS bt_devices (
                 address TEXT PRIMARY KEY,
                 name TEXT,
@@ -167,6 +179,13 @@ class DatabaseManager:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS ble_alert_cooldown (
                 vendor_key TEXT PRIMARY KEY,
+                last_alert_at REAL NOT NULL
+            )
+        """)
+        
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS honeypot_alert_cooldown (
+                src_ip TEXT PRIMARY KEY,
                 last_alert_at REAL NOT NULL
             )
         """)
@@ -611,6 +630,24 @@ class DatabaseManager:
         return False
 
     @classmethod
+    async def should_alert_honeypot(cls, src_ip: str, cooldown_seconds: float) -> bool:
+        db = await cls.get_db()
+        current_time = time.time()
+        
+        cursor = await db.execute("SELECT last_alert_at FROM honeypot_alert_cooldown WHERE src_ip = ?", (src_ip,))
+        row = await cursor.fetchone()
+        
+        if row is None or (current_time - row["last_alert_at"]) >= cooldown_seconds:
+            await db.execute(
+                "INSERT INTO honeypot_alert_cooldown (src_ip, last_alert_at) VALUES (?, ?) ON CONFLICT(src_ip) DO UPDATE SET last_alert_at = excluded.last_alert_at",
+                (src_ip, current_time)
+            )
+            await db.commit()
+            return True
+            
+        return False
+
+    @classmethod
     async def should_alert_resource(cls, metric_key: str, cooldown_hours: float) -> bool:
         db = await cls.get_db()
         current_time = time.time()
@@ -676,3 +713,26 @@ class DatabaseManager:
             (job_name, time.time())
         )
         await db.commit()
+
+    @classmethod
+    async def insert_dns_queries(cls, queries: List[Tuple[float, str, str, str]]):
+        """Batch insert DNS queries (timestamp, src_ip, query_name, query_type)."""
+        db = await cls.get_db()
+        await db.executemany(
+            "INSERT INTO dns_queries (timestamp, src_ip, query_name, query_type) VALUES (?, ?, ?, ?)",
+            queries
+        )
+        await db.commit()
+
+    @classmethod
+    async def get_recent_dns_queries(cls, ip: str, limit: int = 50) -> List[dict]:
+        db = await cls.get_db()
+        cursor = await db.execute("""
+            SELECT query_name, MAX(timestamp) as last_seen, query_type
+            FROM dns_queries
+            WHERE src_ip = ?
+            GROUP BY query_name
+            ORDER BY last_seen DESC
+            LIMIT ?
+        """, (ip, limit))
+        return [dict(row) for row in await cursor.fetchall()]

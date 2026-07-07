@@ -35,7 +35,8 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/whitelist &lt;mac&gt; - Mark a device as safe\n"
         "/attacker &lt;ip&gt; - WHOIS OSINT lookup\n"
         "/monitor &lt;ip&gt; - Pin host for ping monitor\n"
-        "/unmonitor &lt;ip&gt; - Remove host from ping monitor"
+        "/unmonitor &lt;ip&gt; - Remove host from ping monitor\n"
+        "/dns &lt;ip&gt; - View recent DNS queries for host"
     )
     await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
@@ -221,6 +222,46 @@ async def unmonitor_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ Stopped monitoring {ip}.")
     else:
         await update.message.reply_text(f"⚠️ {ip} was not being monitored.")
+
+@auth_required
+async def dns_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Please provide an IP: /dns 192.168.1.100")
+        return
+        
+    target = context.args[0]
+    if not re.match(r"^[a-zA-Z0-9.:-]+$", target):
+        await update.message.reply_text("❌ Invalid IP or MAC address format.")
+        return
+        
+    if re.match(r"^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$", target.upper()):
+        db = await DatabaseManager.get_db()
+        cursor = await db.execute("SELECT ip FROM network_devices WHERE mac = ?", (target.upper(),))
+        row = await cursor.fetchone()
+        if row and row["ip"]:
+            target = row["ip"]
+        else:
+            await update.message.reply_text(f"❌ Unknown MAC address: {target}")
+            return
+        
+    msg = await update.message.reply_text(f"🔍 <i>Fetching recent DNS queries for {target}...</i>", parse_mode=ParseMode.HTML)
+    
+    try:
+        queries = await DatabaseManager.get_recent_dns_queries(target, limit=20)
+        if not queries:
+            await msg.edit_text(f"<i>No DNS queries found for {target} in the retention window.</i>", parse_mode=ParseMode.HTML)
+            return
+            
+        lines = []
+        for q in queries:
+            qtype = q.get("query_type", "A")
+            qname = formatters.escape(q["query_name"])
+            lines.append(f"• [{qtype}] {qname}")
+            
+        out = "\n".join(lines)
+        await msg.edit_text(f"📡 <b>Recent DNS for <code>{target}</code>:</b>\n<pre>{out}</pre>", parse_mode=ParseMode.HTML)
+    except Exception as e:
+        await msg.edit_text(f"❌ Failed to fetch DNS logs: {e}")
 
 @auth_required
 async def traceroute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

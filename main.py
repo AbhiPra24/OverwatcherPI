@@ -23,6 +23,10 @@ async def _post_init(app: Application) -> None:
     # 2. Ensure OUI database is cached
     await oui.load_or_refresh()
     
+    # 2b. Ensure DNS blocklist is cached
+    from core import dns_blocklist
+    await dns_blocklist.load_or_refresh()
+    
     # 3. Start APScheduler within this event loop
     scheduler = setup_scheduler(app)
     scheduler.start()
@@ -52,6 +56,11 @@ async def _post_init(app: Application) -> None:
         )
     except Exception as e:
         logging.getLogger(__name__).error(f"Failed to send boot notification: {e}")
+
+    # 6. Honeypot service
+    if config.honeypot_enabled:
+        from core import honeypot
+        asyncio.create_task(honeypot.start_honeypots(app))
 
 
 def main():

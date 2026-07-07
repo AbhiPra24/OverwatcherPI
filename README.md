@@ -109,6 +109,8 @@ flowchart TD
 - **ARP Spoof Detection** — passive Scapy sniffer watching for conflicting MAC↔IP bindings
 - **Rogue DHCP Detection** — flags unexpected DHCP servers; validates `subnet_mask` and `router` fields against trusted config
 - **SSH Brute-Force Monitoring** — tails `/var/log/auth.log` for repeated failures and successful logins from unknown IPs
+- **Honeypot Canary** — listens on fake ports (e.g. 2323, 8389) and alerts instantly if any device attempts a TCP connection
+- **Passive DNS Logging** — extracts port 53 DNS queries via the sniffer daemon, alerts on known-bad domains (StevenBlack hosts), and surfaces recent lookups in the dashboard
 
 ### 📊 Observability
 - **Latency & Jitter Monitoring** — continuous ping to gateway + WAN; data stored for trend graphs
@@ -146,6 +148,7 @@ flowchart TD
 | `/whitelist <mac>` | Mark a device as known/safe |
 | `/monitor <ip>` | Add host to 1-minute uptime ping monitor |
 | `/unmonitor <ip>` | Remove host from ping monitor |
+| `/dns <ip>` | View recent DNS queries for host |
 
 ---
 
@@ -248,6 +251,8 @@ See [`docs/docker.md`](docs/docker.md) for the full migration guide, healthcheck
 | `API_PORT` | `8000` | FastAPI port |
 | `LOG_FORMAT` | `text` | `text` or `json` (for jq-able logs) |
 | `WATCHED_SERVICES` | `["overwatcher-dashboard","overwatcher-caddy","overwatcher-sniffer"]` | Services to health-monitor |
+| `HONEYPOT_ENABLED` | `false` | Enable canary honeypot listener |
+| `DNS_BLOCKLIST_ENABLED`| `false`| Alert on malware/ads domain queries |
 | `CPU_WARN_PERCENT` | `85.0` | CPU alert threshold |
 | `RAM_WARN_PERCENT` | `85.0` | RAM alert threshold |
 | `DISK_WARN_PERCENT` | `90.0` | Disk alert threshold |

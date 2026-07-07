@@ -82,5 +82,14 @@ if not events_df.empty:
 else:
     st.info("No events associated with this device.")
 
+if not net_device.empty:
+    ip = net_device.iloc[0]['ip']
+    st.markdown("### Recent DNS Queries")
+    dns_df = db.get_device_dns_queries(ip, limit=50)
+    if not dns_df.empty:
+        st.dataframe(dns_df[['datetime', 'query_name', 'query_type']], width="stretch", hide_index=True)
+    else:
+        st.info("No DNS queries recorded for this device.")
+
 if st.button("⬅️ Back to Device History"):
     st.switch_page("views/1_Device_History.py")

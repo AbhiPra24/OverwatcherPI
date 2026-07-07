@@ -61,7 +61,7 @@ def live_overview():
     h_col3.metric("Memory", f"{mem_percent:.1f}%")
     h_col4.metric("Disk", f"{health.disk_percent:.1f}%")
     
-    if "Normal" not in health.throttling_status:
+    if "Normal" not in health.throttling_status and "Not available" not in health.throttling_status:
         st.warning(f"System Throttling Status: {health.throttling_status}")
         
     st.subheader("Pipeline Health")

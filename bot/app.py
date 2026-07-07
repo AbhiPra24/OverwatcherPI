@@ -35,6 +35,7 @@ def setup_application(post_init_hook=None):
             BotCommand("attacker", "WHOIS OSINT lookup"),
             BotCommand("monitor", "Pin host for ping monitor"),
             BotCommand("unmonitor", "Remove host from ping monitor"),
+            BotCommand("dns", "View recent DNS queries for host"),
             BotCommand("export", "Export database to CSV"),
             BotCommand("logs", "Fetch systemd logs")
         ])
@@ -66,6 +67,7 @@ def setup_application(post_init_hook=None):
     app.add_handler(CommandHandler("whitelist", handlers.whitelist_handler))
     app.add_handler(CommandHandler("monitor", handlers.monitor_handler))
     app.add_handler(CommandHandler("unmonitor", handlers.unmonitor_handler))
+    app.add_handler(CommandHandler("dns", handlers.dns_handler))
     app.add_handler(CommandHandler("traceroute", handlers.traceroute_handler))
     app.add_handler(CommandHandler("export", handlers.export_handler))
     app.add_handler(CommandHandler("logs", handlers.logs_handler))

@@ -167,6 +167,21 @@ def get_device_port_history(mac: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 @st.cache_data(ttl=30)
+def get_device_dns_queries(ip: str, limit: int = 100) -> pd.DataFrame:
+    try:
+        with get_connection() as conn:
+            df = pd.read_sql_query(
+                "SELECT timestamp, query_name, query_type FROM dns_queries WHERE src_ip = ? ORDER BY timestamp DESC LIMIT ?",
+                conn, params=(ip, limit)
+            )
+            if not df.empty:
+                df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+            return df
+    except Exception as e:
+        st.error(f"Database error: {e}")
+        return pd.DataFrame()
+
+@st.cache_data(ttl=30)
 def get_security_posture(days: int = 7) -> dict:
     import time
     try:
