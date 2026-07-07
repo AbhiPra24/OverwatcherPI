@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     db_backup_retention_days: int = 30
     dns_retention_days: int = 14
     threat_intel_enabled: bool = False
+    syn_scan_detection_enabled: bool = False
     log_level: str = "INFO"
     log_format: str = "text"
     log_file: Path = Field(default=Path("logs/overwatcher.log"))
