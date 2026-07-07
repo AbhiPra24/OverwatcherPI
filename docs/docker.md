@@ -6,8 +6,8 @@
 |---------|-------------|-----|
 | `bot` | `host` | nmap ARP discovery + BlueZ/D-Bus BLE access |
 | `sniffer` | `host` | Must see real LAN ARP/DHCP broadcast traffic |
-| `dashboard` | bridge (`internal`) | Only reachable via Caddy — never published to host |
-| `caddy` | bridge (`internal`) | Single public entry point on port 8109 |
+| `dashboard` | default bridge | Published to `127.0.0.1:8501` only, reached via Caddy on host network |
+| `caddy` | `host` | Single public entry point on port 8109 |
 
 ### API endpoint (`/api/*`)
 

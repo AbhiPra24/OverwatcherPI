@@ -29,12 +29,12 @@ flowchart TD
             SCAPY["📦 Scapy Passive Sniffer\nARP spoof detection\nRogue DHCP detection"]
         end
 
-        subgraph DASH["overwatcher-dashboard  [bridge: internal]"]
+        subgraph DASH["overwatcher-dashboard  [default bridge]"]
             STREAMLIT["📊 Streamlit Dashboard\nOverview · Device History\nAlerts · Security Posture\nTrends · Port History"]
         end
 
-        subgraph PROXY["overwatcher-caddy  [bridge: internal]"]
-            CADDY["🔒 Caddy Reverse Proxy\n:8109 → dashboard:8501\nBasic Auth"]
+        subgraph PROXY["overwatcher-caddy  [network_mode: host]"]
+            CADDY["🔒 Caddy Reverse Proxy\n:8109 → localhost:8501\nBasic Auth"]
         end
 
         DB[("🗄️ SQLite DB\nnetmon.db\n─────────────\nnetwork_devices\nbt_devices\nevents\ndevice_ports\nport_history\nlatency_samples\nscan_history\njob_heartbeats\ndeferred_scans")]
@@ -66,7 +66,7 @@ flowchart TD
     DB -->|"read-only bind mount"| STREAMLIT
 
     %% Dashboard → Caddy → User
-    STREAMLIT -->|"internal network"| CADDY
+    STREAMLIT -->|"localhost:8501"| CADDY
 
     %% Bot ↔ Telegram
     TGBOT <-->|"HTTPS polling"| TG
@@ -180,8 +180,8 @@ All 4 services will come up:
 |---------|---------|------|
 | `overwatcher-bot` | `host` | — |
 | `overwatcher-sniffer` | `host` | — |
-| `overwatcher-dashboard` | bridge (internal) | not published |
-| `overwatcher-caddy` | bridge (internal) | **8109** (public) |
+| `overwatcher-dashboard` | default bridge | `127.0.0.1:8501` (local only) |
+| `overwatcher-caddy` | `host` | **8109** (public) |
 
 Dashboard: `http://<pi-ip>:8109/`
 
