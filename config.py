@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     ble_scan_timeout: float = 10.0
     ble_alert_cooldown_hours: float = 2.0
     ble_adapter: str = "hci0"
+    dashboard_temp_warn_c: float = 70.0
+    dashboard_temp_crit_c: float = 80.0
     ble_proximity_immediate_dbm: int = -50
     ble_proximity_near_dbm: int = -70
     sweep_interval_minutes: int = 5

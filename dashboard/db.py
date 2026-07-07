@@ -72,17 +72,48 @@ def get_scan_history(days: int = 7) -> pd.DataFrame:
         return pd.DataFrame()
 
 @st.cache_data(ttl=30)
-def get_events(limit: int = 200, category: str = None) -> pd.DataFrame:
+def get_events(limit: int = 200, category: str = None, grouped: bool = False) -> pd.DataFrame:
     try:
         with get_connection() as conn:
-            query = "SELECT timestamp, category, severity, message, related_id FROM events"
             params = []
-            if category and category != "All":
-                query += " WHERE category = ?"
-                params.append(category)
-            query += " ORDER BY timestamp DESC LIMIT ?"
-            params.append(limit)
+            if grouped:
+                query = """
+                    SELECT category, MAX(severity) as severity, message, related_id, 
+                           MIN(timestamp) as first_seen, MAX(timestamp) as last_seen, COUNT(*) as count 
+                    FROM events 
+                """
+                if category and category != "All":
+                    query += " WHERE category = ?"
+                    params.append(category)
+                query += " GROUP BY category, message, related_id ORDER BY last_seen DESC LIMIT ?"
+                params.append(limit)
+            else:
+                query = "SELECT timestamp, category, severity, message, related_id FROM events"
+                if category and category != "All":
+                    query += " WHERE category = ?"
+                    params.append(category)
+                query += " ORDER BY timestamp DESC LIMIT ?"
+                params.append(limit)
+                
             df = pd.read_sql_query(query, conn, params=params)
+            
+            if not df.empty:
+                if grouped:
+                    df['first_seen'] = pd.to_datetime(df['first_seen'], unit='s')
+                    df['last_seen'] = pd.to_datetime(df['last_seen'], unit='s')
+                else:
+                    df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+            return df
+    except Exception as e:
+        st.error(f"Database error: {e}")
+        return pd.DataFrame()
+
+@st.cache_data(ttl=30)
+def get_latency_history(hours: int = 24) -> pd.DataFrame:
+    try:
+        cutoff = time.time() - (hours * 3600)
+        with get_connection() as conn:
+            df = pd.read_sql_query("SELECT timestamp, target, loss_pct, jitter_ms FROM latency_samples WHERE timestamp >= ? ORDER BY timestamp ASC", conn, params=(cutoff,))
             if not df.empty:
                 df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
             return df

@@ -202,6 +202,10 @@ async def latency_quality_job(app: Application):
         
     app.bot_data["latency_stats"]["gateway"] = gw_stats
     app.bot_data["latency_stats"]["wan"] = wan_stats
+    
+    # Persist to database for dashboard trends
+    await DatabaseManager.log_latency_sample("gateway", gw_stats.get("loss_percent", 100.0), gw_stats.get("jitter_ms", 0.0))
+    await DatabaseManager.log_latency_sample("wan", wan_stats.get("loss_percent", 100.0), wan_stats.get("jitter_ms", 0.0))
 
 def setup_scheduler(app: Application) -> AsyncIOScheduler:
     """Initialize APScheduler with jobs."""

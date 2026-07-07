@@ -2,7 +2,7 @@
     # Provide the bcrypt hash of your desired password.
     # Generate it using: caddy hash-password
     basicauth {
-        admin <bcrypt-hash-of-your-password>
+        admin $2a$14$s0JVrz0ctvruLg0qBOFNHOJcokhEkfJyum41CtVy.Nqu5UwfI8oWm
     }
     reverse_proxy 127.0.0.1:8501
 }

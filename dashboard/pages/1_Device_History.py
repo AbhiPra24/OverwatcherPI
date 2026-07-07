@@ -41,7 +41,18 @@ with tab1:
         display_df['first_seen'] = pd.to_datetime(display_df['first_seen'], unit='s')
         display_df['last_seen'] = pd.to_datetime(display_df['last_seen'], unit='s')
         
-        st.dataframe(display_df, width="stretch")
+        def format_vendor(v):
+            if not v or v == "Unknown":
+                return "❓ Unknown"
+            elif str(v).startswith("Private"):
+                return f"🎭 {v}"
+            else:
+                return f"✅ {v}"
+                
+        display_df['vendor_badge'] = display_df['vendor'].apply(format_vendor)
+        
+        # Display with new column order
+        st.dataframe(display_df[['ip', 'mac', 'vendor_badge', 'hostname', 'first_seen', 'last_seen', 'is_known', 'is_active']], width="stretch")
         
         csv_net = display_df.to_csv(index=False).encode('utf-8')
         st.download_button(label="📥 Download CSV", data=csv_net, file_name='network_devices.csv', mime='text/csv')
@@ -71,7 +82,18 @@ with tab2:
             
         display_bt_df['last_seen'] = pd.to_datetime(display_bt_df['last_seen'], unit='s')
         
-        st.dataframe(display_bt_df, width="stretch")
+        def format_vendor(v):
+            if not v or v == "Unknown":
+                return "❓ Unknown"
+            elif str(v).startswith("Private"):
+                return f"🎭 {v}"
+            else:
+                return f"✅ {v}"
+                
+        display_bt_df['name_badge'] = display_bt_df['name'].apply(format_vendor)
+        
+        # Display with new column order
+        st.dataframe(display_bt_df[['address', 'name_badge', 'rssi', 'last_seen', 'is_known', 'manufacturer_data_hex', 'service_uuids']], width="stretch")
         
         csv_bt = display_bt_df.to_csv(index=False).encode('utf-8')
         st.download_button(label="📥 Download CSV", data=csv_bt, file_name='bluetooth_devices.csv', mime='text/csv')

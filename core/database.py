@@ -158,6 +158,16 @@ class DatabaseManager:
             )
         """)
         
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS latency_samples (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp REAL NOT NULL,
+                target TEXT NOT NULL,
+                loss_pct REAL,
+                jitter_ms REAL
+            )
+        """)
+        
         await db.commit()
         
         # Add is_known column if it doesn't exist (schema migration)
@@ -543,3 +553,12 @@ class DatabaseManager:
             return True
             
         return False
+
+    @classmethod
+    async def log_latency_sample(cls, target: str, loss_pct: float, jitter_ms: float):
+        db = await cls.get_db()
+        await db.execute(
+            "INSERT INTO latency_samples (timestamp, target, loss_pct, jitter_ms) VALUES (?, ?, ?, ?)",
+            (time.time(), target, loss_pct, jitter_ms)
+        )
+        await db.commit()

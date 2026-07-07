@@ -1,0 +1,14 @@
+[Unit]
+Description=OverwatcherPI Caddy Reverse Proxy
+After=network.target overwatcher-dashboard.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/abhipra/Work/OverwatcherPI/dashboard
+ExecStart=/usr/bin/caddy run --config /home/abhipra/Work/OverwatcherPI/dashboard/Caddyfile
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
