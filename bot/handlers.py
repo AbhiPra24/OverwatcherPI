@@ -12,6 +12,15 @@ from utils.osint import get_ip_info
 from scanners import network, bluetooth
 from core.database import DatabaseManager
 from core.scan_limits import SCAN_LOCK
+import time
+
+def check_cooldown(context: ContextTypes.DEFAULT_TYPE, command_name: str, cooldown_s: int = 30) -> float:
+    now = time.time()
+    last_run = context.user_data.get(f"last_{command_name}", 0)
+    if now - last_run < cooldown_s:
+        return cooldown_s - (now - last_run)
+    context.user_data[f"last_{command_name}"] = now
+    return 0.0
 
 @auth_required
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -39,6 +48,11 @@ async def status_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @auth_required
 async def network_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cd = check_cooldown(context, "network")
+    if cd > 0:
+        await update.message.reply_text(f"⏳ Please wait {int(cd)}s before using /network again.")
+        return
+        
     if SCAN_LOCK.locked():
         await update.message.reply_text("⏳ A scan is already running, try again shortly.")
         return
@@ -69,6 +83,11 @@ async def network_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @auth_required
 async def bluetooth_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cd = check_cooldown(context, "bluetooth")
+    if cd > 0:
+        await update.message.reply_text(f"⏳ Please wait {int(cd)}s before using /bluetooth again.")
+        return
+        
     if SCAN_LOCK.locked():
         await update.message.reply_text("⏳ A scan is already running, try again shortly.")
         return
@@ -89,7 +108,12 @@ async def bluetooth_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @auth_required
 async def speedtest_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("🚀 <i>Running Speedtest... (this may take a minute)</i>", parse_mode=ParseMode.HTML)
+    cd = check_cooldown(context, "speedtest", cooldown_s=60)
+    if cd > 0:
+        await update.message.reply_text(f"⏳ Please wait {int(cd)}s before using /speedtest again.")
+        return
+        
+    msg = await update.message.reply_text("🚀 <i>Running Speedtest (takes ~30s)...</i>", parse_mode=ParseMode.HTML)
     
     def run_st():
         st = speedtest.Speedtest()

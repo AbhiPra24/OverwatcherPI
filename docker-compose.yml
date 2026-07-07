@@ -8,6 +8,8 @@ services:
       dockerfile: Dockerfile
     container_name: overwatcher-bot
     network_mode: host          # required: nmap ARP discovery + BlueZ D-Bus
+    security_opt:
+      - apparmor:unconfined
     cap_add:
       - NET_RAW
       - NET_ADMIN

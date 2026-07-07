@@ -83,6 +83,8 @@ def live_overview():
                 warn_threshold = 120
             elif "speedtest" in job_name:
                 warn_threshold = config.speedtest_interval_hours * 60 * 2
+            elif "telegram_delivery" in job_name:
+                warn_threshold = 180 # 3 hours (expecting at least hourly reports or periodic sweeps)
                 
             icon = "✅" if mins_ago < warn_threshold else "⚠️"
             col.metric(f"{icon} {job_name}", f"{mins_ago:.1f}m ago")

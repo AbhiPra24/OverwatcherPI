@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: "pip"
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio ruff
+        
+    - name: Run Ruff (Linting)
+      run: |
+        # Just fail on obvious errors, don't enforce strict style
+        ruff check .
+        
+    - name: Sanity check (Import main)
+      run: |
+        # Catches import-time errors (missing modules, syntax errors) before running tests
+        python -c "import main"
+        
+    - name: Sanity check (Config parsing)
+      run: |
+        # Dummy .env to satisfy required fields
+        cat << EOF > .env
+        TELEGRAM_BOT_TOKEN=dummy
+        TELEGRAM_OWNER_IDS=12345
+        API_TOKEN=dummy
+        EOF
+        python -c "from config import config; print('Config loaded successfully')"
+        
+    - name: Run Pytest
+      run: |
+        PYTHONPATH=. pytest tests/

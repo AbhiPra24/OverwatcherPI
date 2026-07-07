@@ -1,7 +1,6 @@
 import logging
 from typing import List
-from fastapi import FastAPI, Depends, HTTPException, Security
-from fastapi.security import APIKeyHeader
+from fastapi import FastAPI, HTTPException
 import uvicorn
 import asyncio
 from pydantic import BaseModel
@@ -12,15 +11,6 @@ from core.database import DatabaseManager, NetworkDevice
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="OverwatcherPI API", version="1.0.0")
-api_key_header = APIKeyHeader(name="X-API-Token")
-
-def verify_token(api_key: str = Security(api_key_header)):
-    if api_key != config.api_token:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid X-API-Token",
-        )
-    return api_key
 
 class DeviceResponse(BaseModel):
     mac: str
@@ -29,7 +19,7 @@ class DeviceResponse(BaseModel):
     hostname: str
 
 @app.get("/api/devices", response_model=List[DeviceResponse])
-async def get_active_devices(token: str = Depends(verify_token)):
+async def get_active_devices():
     devices = await DatabaseManager.get_active_devices()
     return [{"mac": d.mac, "ip": d.ip, "vendor": d.vendor, "hostname": d.hostname} for d in devices]
 

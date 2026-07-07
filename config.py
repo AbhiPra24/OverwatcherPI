@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     @field_validator("watched_services", mode="before")
     def parse_watched_services(cls, v):
         if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
             return [x.strip() for x in v.split(",") if x.strip()]
         return v
 

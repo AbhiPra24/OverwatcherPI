@@ -24,3 +24,7 @@ logs/
 # OS specific
 .DS_Store
 Thumbs.db
+
+.env.bak
+data.bak/
+logs.bak/
