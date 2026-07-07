@@ -56,8 +56,23 @@ async def load_or_refresh(force: bool = False):
         logger.error(f"Exception during OUI download: {e}")
 
 
+def is_locally_administered(mac: str) -> bool:
+    """Check if bit 0x02 is set on the first octet (randomized/private MAC)."""
+    clean_mac = mac.replace(":", "").replace("-", "").strip()
+    if len(clean_mac) >= 2:
+        try:
+            first_octet = int(clean_mac[:2], 16)
+            return bool(first_octet & 0x02)
+        except ValueError:
+            pass
+    return False
+
+
 async def get_vendor(mac: str) -> str:
     """Lookup a MAC address in the OUI cache."""
+    if is_locally_administered(mac):
+        return "Private (randomized)"
+        
     # Normalize MAC (e.g., 'C0:2E:1D:6E:F4:10' -> 'C02E1D')
     clean_mac = mac.replace(":", "").replace("-", "").upper()
     if len(clean_mac) >= 6:

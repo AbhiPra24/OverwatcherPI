@@ -46,7 +46,13 @@ def format_network(devices: List[NetworkDevice], new_macs: Set[str] = None) -> s
         info_parts = []
         if dev.hostname:
             info_parts.append(f"<i>{escape(dev.hostname)}</i>")
-        info_parts.append(escape(dev.vendor))
+            
+        if dev.vendor == "Private (randomized)":
+            info_parts.append(f"🎭 {escape(dev.vendor)}")
+        elif dev.vendor == "Unknown":
+            info_parts.append(f"❓ {escape(dev.vendor)}")
+        else:
+            info_parts.append(escape(dev.vendor))
         
         lines.append("   " + " | ".join(info_parts))
         lines.append("")

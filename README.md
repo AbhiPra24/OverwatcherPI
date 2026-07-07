@@ -15,7 +15,7 @@ A fully async, modular, open-source daemon that streams telemetry to a secure Te
 - Raspberry Pi (optimized for Pi 5 8GB)
 - Linux OS (Raspberry Pi OS Bookworm or similar)
 - Python 3.10+
-- `nmap` installed globally (`sudo apt install nmap`)
+- `nmap` and `samba-common-bin` installed globally (`sudo apt install nmap samba-common-bin`)
 
 ## Installation
 
@@ -82,3 +82,6 @@ The recommended deployment path is `/opt/OverwatcherPI/`.
 - `/whitelist <mac>` — Mark a device MAC as safe
 - `/monitor <ip>` — Pin a critical host for 1-minute downtime checks
 - `/unmonitor <ip>` — Remove a host from ping monitor
+
+## Known Limitations
+- **BLE Tracking:** iOS/Android BLE addresses rotate roughly every 15 minutes by design. Devices never paired/bonded with this Pi cannot be reliably tracked or identified long-term — that's BLE privacy working as intended, not a bug.

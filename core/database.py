@@ -18,12 +18,17 @@ class NetworkDevice(BaseModel):
     vendor: str = "Unknown"
     hostname: str = ""
     is_new: bool = False
+    raw_mdns_name: Optional[str] = None
+    raw_ssdp_server: Optional[str] = None
+    raw_netbios_name: Optional[str] = None
 
 
 class BLEDevice(BaseModel):
     address: str
     name: str = "Unknown"
     rssi: int
+    manufacturer_data_hex: Optional[str] = None
+    service_uuids: Optional[str] = None
 
 
 class HourlyStats(BaseModel):
@@ -79,7 +84,10 @@ class DatabaseManager:
                 hostname TEXT,
                 first_seen REAL NOT NULL,
                 last_seen REAL NOT NULL,
-                is_active INTEGER DEFAULT 1
+                is_active INTEGER DEFAULT 1,
+                raw_mdns_name TEXT,
+                raw_ssdp_server TEXT,
+                raw_netbios_name TEXT
             )
         """)
         
@@ -96,7 +104,9 @@ class DatabaseManager:
                 address TEXT PRIMARY KEY,
                 name TEXT,
                 rssi INTEGER,
-                last_seen REAL NOT NULL
+                last_seen REAL NOT NULL,
+                manufacturer_data_hex TEXT,
+                service_uuids TEXT
             )
         """)
         
@@ -121,11 +131,18 @@ class DatabaseManager:
         cols = [row["name"] for row in await cursor.fetchall()]
         if "is_known" not in cols:
             await db.execute("ALTER TABLE network_devices ADD COLUMN is_known INTEGER DEFAULT 0")
+        if "raw_mdns_name" not in cols:
+            await db.execute("ALTER TABLE network_devices ADD COLUMN raw_mdns_name TEXT")
+            await db.execute("ALTER TABLE network_devices ADD COLUMN raw_ssdp_server TEXT")
+            await db.execute("ALTER TABLE network_devices ADD COLUMN raw_netbios_name TEXT")
             
         cursor = await db.execute("PRAGMA table_info(bt_devices)")
         cols = [row["name"] for row in await cursor.fetchall()]
         if "is_known" not in cols:
             await db.execute("ALTER TABLE bt_devices ADD COLUMN is_known INTEGER DEFAULT 0")
+        if "manufacturer_data_hex" not in cols:
+            await db.execute("ALTER TABLE bt_devices ADD COLUMN manufacturer_data_hex TEXT")
+            await db.execute("ALTER TABLE bt_devices ADD COLUMN service_uuids TEXT")
             
         logger.info("Database tables initialized.")
 
@@ -146,15 +163,18 @@ class DatabaseManager:
         
         # Upsert devices
         await db.executemany("""
-            INSERT INTO network_devices (mac, ip, vendor, hostname, first_seen, last_seen, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO network_devices (mac, ip, vendor, hostname, first_seen, last_seen, is_active, raw_mdns_name, raw_ssdp_server, raw_netbios_name)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
             ON CONFLICT(mac) DO UPDATE SET
                 ip = excluded.ip,
                 vendor = excluded.vendor,
                 hostname = CASE WHEN excluded.hostname != '' THEN excluded.hostname ELSE network_devices.hostname END,
                 last_seen = excluded.last_seen,
-                is_active = 1
-        """, [(d.mac, d.ip, d.vendor, d.hostname, current_time, current_time) for d in devices])
+                is_active = 1,
+                raw_mdns_name = CASE WHEN excluded.raw_mdns_name IS NOT NULL THEN excluded.raw_mdns_name ELSE network_devices.raw_mdns_name END,
+                raw_ssdp_server = CASE WHEN excluded.raw_ssdp_server IS NOT NULL THEN excluded.raw_ssdp_server ELSE network_devices.raw_ssdp_server END,
+                raw_netbios_name = CASE WHEN excluded.raw_netbios_name IS NOT NULL THEN excluded.raw_netbios_name ELSE network_devices.raw_netbios_name END
+        """, [(d.mac, d.ip, d.vendor, d.hostname, current_time, current_time, d.raw_mdns_name, d.raw_ssdp_server, d.raw_netbios_name) for d in devices])
         
         # Mark missing devices as inactive
         if current_macs:
@@ -208,13 +228,15 @@ class DatabaseManager:
         new_macs = current_macs - known_macs
         
         await db.executemany("""
-            INSERT INTO bt_devices (address, name, rssi, last_seen)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO bt_devices (address, name, rssi, last_seen, manufacturer_data_hex, service_uuids)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(address) DO UPDATE SET
-                name = CASE WHEN excluded.name != 'Unknown' THEN excluded.name ELSE bt_devices.name END,
+                name = CASE WHEN excluded.name != 'Unknown' AND excluded.name != '' THEN excluded.name ELSE bt_devices.name END,
                 rssi = excluded.rssi,
-                last_seen = excluded.last_seen
-        """, [(d.address, d.name, d.rssi, current_time) for d in devices])
+                last_seen = excluded.last_seen,
+                manufacturer_data_hex = CASE WHEN excluded.manufacturer_data_hex IS NOT NULL THEN excluded.manufacturer_data_hex ELSE bt_devices.manufacturer_data_hex END,
+                service_uuids = CASE WHEN excluded.service_uuids IS NOT NULL THEN excluded.service_uuids ELSE bt_devices.service_uuids END
+        """, [(d.address, d.name, d.rssi, current_time, d.manufacturer_data_hex, d.service_uuids) for d in devices])
         
         await db.commit()
         return new_macs

@@ -75,17 +75,21 @@ def _get_mdns_names() -> dict:
                 pass
 
     try:
+        from zeroconf import ZeroconfServiceTypes
         zc = Zeroconf()
-        types = [
+        dynamic_types = list(ZeroconfServiceTypes.find(zc=zc, timeout=1.5))
+        fixed_types = [
             '_googlecast._tcp.local.', '_apple-mobdev2._tcp.local.', 
             '_hap._tcp.local.', '_http._tcp.local.', '_smb._tcp.local.', 
             '_printer._tcp.local.', '_ipp._tcp.local.', '_spotify-connect._tcp.local.', 
             '_airplay._tcp.local.', '_raop._tcp.local.', '_sleep-proxy._udp.local.',
             '_companion-link._tcp.local.', '_homekit._tcp.local.', '_services._dns-sd._udp.local.'
         ]
-        browser = ServiceBrowser(zc, types, Listener())
+        all_types = list(set(dynamic_types + fixed_types))
+        
+        browser = ServiceBrowser(zc, all_types, Listener())
         import time
-        time.sleep(3)
+        time.sleep(2)
         zc.close()
     except Exception as e:
         logger.error(f"Zeroconf failed: {e}")
@@ -93,11 +97,34 @@ def _get_mdns_names() -> dict:
     return ip_names
 
 
+async def _resolve_netbios(ip: str) -> str:
+    """Resolve NetBIOS name using nmblookup."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "nmblookup", "-A", ip,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode == 0:
+            lines = stdout.decode('utf-8', errors='ignore').splitlines()
+            for line in lines:
+                if '<00>' in line and 'UNIQUE' in line and 'ACTIVE' in line:
+                    parts = line.split('<00>')
+                    if parts:
+                        return parts[0].strip()
+    except Exception as e:
+        logger.debug(f"NetBIOS lookup failed for {ip}: {e}")
+    return ""
+
+
 async def scan() -> List[NetworkDevice]:
     """Run an async nmap scan and enrich the results."""
     logger.info(f"Starting network scan on {config.scan_subnet}...")
     
     mdns_task = asyncio.create_task(asyncio.to_thread(_get_mdns_names))
+    from scanners import ssdp
+    ssdp_task = asyncio.create_task(ssdp.discover(timeout=3.0))
     
     cmd = ["nmap", "--privileged", "-sn", "-oX", "-", config.scan_subnet]
     
@@ -119,24 +146,75 @@ async def scan() -> List[NetworkDevice]:
     xml_output = stdout.decode('utf-8')
     raw_devices = await asyncio.to_thread(_parse_nmap_xml, xml_output)
     mdns_results = await mdns_task
+    ssdp_results = await ssdp_task
     
     results = []
+    
     for raw in raw_devices:
-        # Resolve vendor via local OUI cache for more accurate/current results than nmap's static list
+        ip = raw["ip"]
         vendor = await oui.get_vendor(raw["mac"])
         if vendor == "Unknown" and raw["nmap_vendor"] != "Unknown":
             vendor = raw["nmap_vendor"]
             
-        hostname = mdns_results.get(raw["ip"])
-        if not hostname:
-            hostname = await _resolve_hostname(raw["ip"])
+        mdns_name = mdns_results.get(ip)
+        ssdp_server = ssdp_results.get(ip)
+        netbios_name = await _resolve_netbios(ip)
         
-        results.append(NetworkDevice(
-            ip=raw["ip"],
-            mac=raw["mac"],
-            vendor=vendor,
-            hostname=hostname
+        hostname = mdns_name
+        if not hostname:
+            hostname = netbios_name
+        if not hostname:
+            hostname = await _resolve_hostname(ip)
+            
+        results.append({
+            "ip": ip,
+            "mac": raw["mac"],
+            "vendor": vendor,
+            "hostname": hostname,
+            "raw_mdns_name": mdns_name,
+            "raw_ssdp_server": ssdp_server,
+            "raw_netbios_name": netbios_name
+        })
+
+    for res in results:
+        if res["vendor"] == "Unknown" and not res["hostname"]:
+            try:
+                ip = res["ip"]
+                b_proc = await asyncio.create_subprocess_exec(
+                    "nmap", "-sV", "--script", "http-title,snmp-info", ip,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                
+                try:
+                    b_stdout, _ = await asyncio.wait_for(b_proc.communicate(), timeout=15.0)
+                    if b_proc.returncode == 0:
+                        out = b_stdout.decode('utf-8', errors='ignore')
+                        for line in out.splitlines():
+                            if "http-title:" in line:
+                                title = line.split("http-title:", 1)[1].strip()
+                                res["hostname"] = title
+                                break
+                            if "snmp-info:" in line:
+                                info = line.split("snmp-info:", 1)[1].strip()
+                                res["hostname"] = info
+                                break
+                except asyncio.TimeoutError:
+                    b_proc.kill()
+            except Exception as e:
+                logger.debug(f"Banner grab failed for {res['ip']}: {e}")
+
+    final_results = []
+    for res in results:
+        final_results.append(NetworkDevice(
+            ip=res["ip"],
+            mac=res["mac"],
+            vendor=res["vendor"],
+            hostname=res["hostname"] or "",
+            raw_mdns_name=res["raw_mdns_name"],
+            raw_ssdp_server=res["raw_ssdp_server"],
+            raw_netbios_name=res["raw_netbios_name"]
         ))
         
-    logger.info(f"Scan complete. Found {len(results)} active devices.")
-    return results
+    logger.info(f"Scan complete. Found {len(final_results)} active devices.")
+    return final_results

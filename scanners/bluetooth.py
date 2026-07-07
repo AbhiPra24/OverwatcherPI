@@ -24,13 +24,29 @@ async def scan() -> List[BLEDevice]:
         )
         
         for address, (device, adv_data) in discovered.items():
-            name = device.name or "Unknown"
+            name = device.name or ""
             rssi = adv_data.rssi
+            manufacturer_data = adv_data.manufacturer_data or {}
+            service_uuids = adv_data.service_uuids or []
             
+            if not name:
+                from core.ble_vendors import get_ble_vendor
+                name = get_ble_vendor(manufacturer_data, service_uuids)
+
+            mfr_hex = None
+            if manufacturer_data:
+                mfr_hex = ", ".join(f"{cid:04X}: {data.hex()}" for cid, data in manufacturer_data.items())
+            
+            srv_uuids_str = None
+            if service_uuids:
+                srv_uuids_str = ",".join(service_uuids)
+
             results.append(BLEDevice(
                 address=address,
-                name=name,
-                rssi=rssi
+                name=name or "Unknown",
+                rssi=rssi,
+                manufacturer_data_hex=mfr_hex,
+                service_uuids=srv_uuids_str
             ))
             
         logger.info(f"Bluetooth scan complete. Found {len(results)} devices.")
