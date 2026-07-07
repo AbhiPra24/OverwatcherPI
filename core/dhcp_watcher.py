@@ -2,6 +2,7 @@ import logging
 from config import config
 from telegram import Bot
 from telegram.constants import ParseMode
+from core.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,12 @@ class DHCPWatcher:
                             chat_id=config.telegram_owner_id,
                             text=msg,
                             parse_mode=ParseMode.HTML
+                        )
+                        await DatabaseManager.log_event(
+                            category="security",
+                            severity="high",
+                            message=f"Rogue DHCP server detected: offer from {src_ip} (MAC {mac}), expected {self.trusted}.",
+                            related_id=mac
                         )
                     except Exception as e:
                         logger.error(f"Failed to send DHCP alert: {e}")

@@ -140,6 +140,17 @@ class DatabaseManager:
             )
         """)
         
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp REAL NOT NULL,
+                category TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                message TEXT NOT NULL,
+                related_id TEXT
+            )
+        """)
+        
         await db.commit()
         
         # Add is_known column if it doesn't exist (schema migration)
@@ -441,3 +452,13 @@ class DatabaseManager:
             
         await db.commit()
         return new_ports
+
+    @classmethod
+    async def log_event(cls, category: str, severity: str, message: str, related_id: Optional[str] = None):
+        """Log an event/alert to the database for the dashboard."""
+        db = await cls.get_db()
+        await db.execute(
+            "INSERT INTO events (timestamp, category, severity, message, related_id) VALUES (?, ?, ?, ?, ?)",
+            (time.time(), category, severity, message, related_id)
+        )
+        await db.commit()

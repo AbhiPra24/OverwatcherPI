@@ -7,6 +7,7 @@ from telegram.ext import Application
 from telegram.constants import ParseMode
 
 from config import config
+from core.database import DatabaseManager
 from utils.osint import get_ip_info
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,12 @@ async def ssh_log_watcher(app: Application):
                                         text=f"🚨 <b>SSH Brute Force Detected:</b>\n5 failed logins in 10 mins from IP: <code>{escaped_ip}</code>\n\n<b>OSINT Data:</b>\n<pre>{html.escape(osint_data)}</pre>",
                                         parse_mode=ParseMode.HTML
                                     )
+                                    await DatabaseManager.log_event(
+                                        category="security",
+                                        severity="high",
+                                        message=f"SSH Brute Force Detected: 5 failed logins in 10 mins from IP: {escaped_ip}",
+                                        related_id=alert_ip
+                                    )
                                 except Exception as e:
                                     logger.error(f"Failed to send SSH alert: {e}")
                                     
@@ -89,6 +96,12 @@ async def ssh_log_watcher(app: Application):
                                 chat_id=config.telegram_owner_id,
                                 text=f"✅ <b>SSH Login Successful:</b>\nFrom IP: <code>{safe_ip}</code>",
                                 parse_mode=ParseMode.HTML
+                            )
+                            await DatabaseManager.log_event(
+                                category="security",
+                                severity="info",
+                                message=f"SSH Login Successful from IP: {safe_ip}",
+                                related_id=ip
                             )
                         except Exception:
                             pass

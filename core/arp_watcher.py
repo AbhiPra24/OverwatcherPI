@@ -3,6 +3,7 @@ import logging
 from telegram import Bot
 from telegram.constants import ParseMode
 from config import config
+from core.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,12 @@ class ARPWatcher:
                                 chat_id=config.telegram_owner_id,
                                 text=msg,
                                 parse_mode=ParseMode.HTML
+                            )
+                            await DatabaseManager.log_event(
+                                category="security",
+                                severity="high",
+                                message=f"ARP conflict: {ip} claimed by both {old_mac} and {mac}.",
+                                related_id=ip
                             )
                         except Exception as e:
                             logger.error(f"Failed to send ARP alert: {e}")

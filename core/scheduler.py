@@ -69,6 +69,12 @@ async def fast_sweep_job(app: Application):
                              f"🔓 Open Ports: {ports_str}",
                         parse_mode=ParseMode.HTML
                     )
+                    await DatabaseManager.log_event(
+                        category="network",
+                        severity="warning",
+                        message=f"Unknown device joined the network: {d.vendor} (IP: {d.ip}, Ports: {ports_str})",
+                        related_id=d.mac
+                    )
                 except Exception as e:
                     logger.error(f"Failed to send alert: {e}")
                 
@@ -81,6 +87,12 @@ async def fast_sweep_job(app: Application):
                     chat_id=config.telegram_owner_id,
                     text=f"🚨 <b>Unknown Bluetooth device detected:</b> {name} (MAC: <code>{mac}</code>)",
                     parse_mode=ParseMode.HTML
+                )
+                await DatabaseManager.log_event(
+                    category="bluetooth",
+                    severity="warning",
+                    message=f"Unknown Bluetooth device detected: {name}",
+                    related_id=mac
                 )
             except Exception as e:
                 logger.error(f"Failed to send alert: {e}")
@@ -145,6 +157,12 @@ async def ping_sweep_job(app: Application):
                         text=f"⚠️ <b>Critical Host Offline:</b> <code>{ip}</code> is not responding to ping!",
                         parse_mode=ParseMode.HTML
                     )
+                    await DatabaseManager.log_event(
+                        category="network",
+                        severity="high",
+                        message=f"Critical Host Offline: {ip} is not responding to ping!",
+                        related_id=ip
+                    )
                 except Exception:
                     pass
         else:
@@ -155,6 +173,12 @@ async def ping_sweep_job(app: Application):
                         chat_id=config.telegram_owner_id,
                         text=f"✅ <b>Host Recovered:</b> <code>{ip}</code> is back online.",
                         parse_mode=ParseMode.HTML
+                    )
+                    await DatabaseManager.log_event(
+                        category="network",
+                        severity="info",
+                        message=f"Host Recovered: {ip} is back online.",
+                        related_id=ip
                     )
                 except Exception:
                     pass
@@ -277,6 +301,12 @@ async def port_drift_job(app: Application):
                         chat_id=config.telegram_owner_id,
                         text=f"🚨 <b>Port Drift Alert:</b> <code>{d.mac}</code> ({d.hostname or d.vendor}) just opened new port(s): {ports_str} — wasn't open last scan.",
                         parse_mode=ParseMode.HTML
+                    )
+                    await DatabaseManager.log_event(
+                        category="network",
+                        severity="warning",
+                        message=f"Port Drift Alert: {d.hostname or d.vendor} opened new port(s): {ports_str}",
+                        related_id=d.mac
                     )
                 except Exception as e:
                     logger.error(f"Failed to send port drift alert for {d.mac}: {e}")
