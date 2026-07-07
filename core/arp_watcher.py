@@ -28,12 +28,16 @@ class ARPWatcher:
                     if now - last_seen < 60:
                         msg = f"🚨 <b>ARP conflict:</b> <code>{ip}</code> claimed by both <code>{old_mac}</code> and <code>{mac}</code>."
                         logger.warning(msg)
+                        for owner_id in config.telegram_owner_ids:
+                            try:
+                                await self.bot.send_message(
+                                    chat_id=owner_id,
+                                    text=msg,
+                                    parse_mode=ParseMode.HTML
+                                )
+                            except Exception as e:
+                                logger.error(f"Failed to send ARP alert to {owner_id}: {e}")
                         try:
-                            await self.bot.send_message(
-                                chat_id=config.telegram_owner_id,
-                                text=msg,
-                                parse_mode=ParseMode.HTML
-                            )
                             await DatabaseManager.log_event(
                                 category="security",
                                 severity="high",
@@ -41,7 +45,7 @@ class ARPWatcher:
                                 related_id=ip
                             )
                         except Exception as e:
-                            logger.error(f"Failed to send ARP alert: {e}")
+                            logger.error(f"Failed to log ARP alert: {e}")
                     else:
                         logger.info(f"ARP change for {ip}: {old_mac} -> {mac}")
                         

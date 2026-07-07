@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     disk_warn_percent: float = 90.0
     resource_alert_cooldown_hours: float = 1.0
     watched_services: List[str] = ["overwatcher-dashboard", "overwatcher-caddy", "overwatcher-sniffer"]
+    quiet_hours_start: int = 1
+    quiet_hours_end: int = 5
+    network_jitter_threshold_ms: float = 50.0
+    api_token: str = "default_secure_token"
+    api_port: int = 8000
 
     @field_validator("watched_services", mode="before")
     def parse_watched_services(cls, v):

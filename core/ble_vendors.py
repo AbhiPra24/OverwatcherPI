@@ -48,3 +48,24 @@ def get_ble_vendor(manufacturer_data: Dict[int, bytes], service_uuids: List[str]
                 return f"Unknown ({SERVICE_UUIDS[uuid_lower]} device)"
                 
     return vendor
+
+import hashlib
+
+def compute_fingerprint(manufacturer_data: Dict[int, bytes], service_uuids: List[str], tx_power: Optional[int]) -> str:
+    """
+    Computes a stable fingerprint string from BLE advertisement metadata.
+    NOTE: This identifies a *device model/class* behaving consistently, not a cryptographic identity.
+    It's a best-effort grouping signal and collisions may occur for generic devices.
+    """
+    parts = []
+    if service_uuids:
+        parts.append(",".join(sorted(service_uuids)))
+    if manufacturer_data:
+        parts.append(",".join(str(k) for k in sorted(manufacturer_data.keys())))
+    
+    # Bucket tx_power to nearest 5 dBm to absorb minor jitter
+    bucketed_tx = round((tx_power or 0) / 5) * 5
+    parts.append(str(bucketed_tx))
+    
+    raw = "|".join(parts).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()[:16]

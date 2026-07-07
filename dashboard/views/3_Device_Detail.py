@@ -57,6 +57,18 @@ if not ports_df.empty:
 else:
     st.info("No open ports found or device hasn't been scanned.")
 
+st.markdown("### Port History")
+port_history_df = db.get_device_port_history(mac)
+if not port_history_df.empty:
+    def color_event(val):
+        if val == 'opened': return 'color: red'
+        if val == 'closed': return 'color: green'
+        return 'color: inherit'
+        
+    st.dataframe(port_history_df[['datetime', 'port', 'service', 'event']].style.map(color_event, subset=['event']), width="stretch", hide_index=True)
+else:
+    st.info("No port history recorded for this device.")
+
 st.markdown("### Event History")
 events_df = db.get_device_events(mac)
 if not events_df.empty:

@@ -40,6 +40,9 @@ async def scan() -> List[BLEDevice]:
             if not name:
                 from core.ble_vendors import get_ble_vendor
                 name = get_ble_vendor(manufacturer_data, service_uuids)
+                
+            from core.ble_vendors import compute_fingerprint
+            fingerprint = compute_fingerprint(manufacturer_data, service_uuids, tx_power)
 
             mfr_hex = None
             if manufacturer_data:
@@ -55,7 +58,8 @@ async def scan() -> List[BLEDevice]:
                 rssi=rssi,
                 manufacturer_data_hex=mfr_hex,
                 service_uuids=srv_uuids_str,
-                tx_power=tx_power
+                tx_power=tx_power,
+                fingerprint=fingerprint
             ))
             
         logger.info(f"Bluetooth scan complete. Found {len(results)} devices.")

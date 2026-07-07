@@ -56,6 +56,11 @@ async def _post_init(app: Application) -> None:
     scheduler.start()
     logging.getLogger(__name__).info("APScheduler background jobs started.")
 
+    # 4. Start API Server
+    from api.server import start_api_server
+    asyncio.create_task(start_api_server())
+    logging.getLogger(__name__).info("FastAPI server starting...")
+
     # 4. Boot notification
     try:
         from bot.broadcaster import broadcast_message

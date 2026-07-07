@@ -33,6 +33,7 @@ class BLEDevice(BaseModel):
     tx_power: Optional[int] = None
     rssi_history: str = "[]"
     proximity: str = "Unknown"
+    fingerprint: Optional[str] = None
 
 
 class HourlyStats(BaseModel):
@@ -141,6 +142,18 @@ class DatabaseManager:
         """)
         
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS port_history (
+                mac TEXT,
+                port INTEGER,
+                service TEXT,
+                event TEXT,
+                timestamp REAL
+            )
+        """)
+        
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_port_history_mac ON port_history(mac)")
+        
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp REAL NOT NULL,
@@ -172,6 +185,14 @@ class DatabaseManager:
                 target TEXT NOT NULL,
                 loss_pct REAL,
                 jitter_ms REAL
+            )
+        """)
+        
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS deferred_scans (
+                mac TEXT PRIMARY KEY,
+                ip TEXT NOT NULL,
+                queued_at REAL NOT NULL
             )
         """)
         
@@ -207,6 +228,9 @@ class DatabaseManager:
         if "tx_power" not in cols:
             await db.execute("ALTER TABLE bt_devices ADD COLUMN tx_power INTEGER")
             await db.execute("ALTER TABLE bt_devices ADD COLUMN rssi_history TEXT DEFAULT '[]'")
+        if "fingerprint" not in cols:
+            await db.execute("ALTER TABLE bt_devices ADD COLUMN fingerprint TEXT")
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_bt_devices_fingerprint ON bt_devices(fingerprint)")
             
         logger.info("Database tables initialized.")
 
@@ -307,11 +331,11 @@ class DatabaseManager:
             hist.append(d.rssi)
             hist = hist[-5:]  # Keep last 5 samples
             d.rssi_history = json.dumps(hist)
-            upsert_data.append((d.address, d.name, d.rssi, current_time, d.manufacturer_data_hex, d.service_uuids, d.tx_power, d.rssi_history))
+            upsert_data.append((d.address, d.name, d.rssi, current_time, d.manufacturer_data_hex, d.service_uuids, d.tx_power, d.rssi_history, d.fingerprint))
 
         await db.executemany("""
-            INSERT INTO bt_devices (address, name, rssi, last_seen, manufacturer_data_hex, service_uuids, tx_power, rssi_history)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO bt_devices (address, name, rssi, last_seen, manufacturer_data_hex, service_uuids, tx_power, rssi_history, fingerprint)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(address) DO UPDATE SET
                 name = CASE WHEN excluded.name != 'Unknown' AND excluded.name != '' THEN excluded.name ELSE bt_devices.name END,
                 rssi = excluded.rssi,
@@ -319,7 +343,8 @@ class DatabaseManager:
                 manufacturer_data_hex = CASE WHEN excluded.manufacturer_data_hex IS NOT NULL THEN excluded.manufacturer_data_hex ELSE bt_devices.manufacturer_data_hex END,
                 service_uuids = CASE WHEN excluded.service_uuids IS NOT NULL THEN excluded.service_uuids ELSE bt_devices.service_uuids END,
                 tx_power = excluded.tx_power,
-                rssi_history = excluded.rssi_history
+                rssi_history = excluded.rssi_history,
+                fingerprint = CASE WHEN excluded.fingerprint IS NOT NULL THEN excluded.fingerprint ELSE bt_devices.fingerprint END
         """, upsert_data)
         
         await db.commit()
@@ -347,6 +372,15 @@ class DatabaseManager:
             return True
             
         return False
+
+    @classmethod
+    async def was_fingerprint_seen_recently(cls, fingerprint: str, hours: float = 24.0) -> bool:
+        if not fingerprint:
+            return False
+        db = await cls.get_db()
+        cutoff = time.time() - (hours * 3600)
+        cursor = await db.execute("SELECT 1 FROM bt_devices WHERE fingerprint = ? AND last_seen >= ? LIMIT 1", (fingerprint, cutoff))
+        return await cursor.fetchone() is not None
 
     @classmethod
     async def get_hourly_stats(cls, hours: int = 1) -> HourlyStats:
@@ -456,17 +490,20 @@ class DatabaseManager:
         db = await cls.get_db()
         current_time = time.time()
         
-        cursor = await db.execute("SELECT port, is_active FROM device_ports WHERE mac = ?", (mac,))
-        existing_ports = {row["port"]: row["is_active"] for row in await cursor.fetchall()}
+        cursor = await db.execute("SELECT port, service, is_active FROM device_ports WHERE mac = ?", (mac,))
+        existing_ports = {row["port"]: row for row in await cursor.fetchall()}
         
         new_ports = []
         upsert_data = []
+        history_inserts = []
+        
         for p in ports:
             port = p["port"]
             service = p["service"]
             upsert_data.append((mac, port, service, current_time, current_time))
-            if port not in existing_ports or existing_ports[port] == 0:
+            if port not in existing_ports or existing_ports[port]["is_active"] == 0:
                 new_ports.append(p)
+                history_inserts.append((mac, port, service, "opened", current_time))
                 
         if upsert_data:
             await db.executemany("""
@@ -479,10 +516,15 @@ class DatabaseManager:
             """, upsert_data)
             
         current_port_nums = {p["port"] for p in ports}
-        gone_ports = [p for p in existing_ports if existing_ports[p] == 1 and p not in current_port_nums]
+        gone_ports = [p for p in existing_ports if existing_ports[p]["is_active"] == 1 and p not in current_port_nums]
         if gone_ports:
             placeholders = ",".join("?" * len(gone_ports))
             await db.execute(f"UPDATE device_ports SET is_active = 0 WHERE mac = ? AND port IN ({placeholders})", [mac] + gone_ports)
+            for gp in gone_ports:
+                history_inserts.append((mac, gp, existing_ports[gp]["service"], "closed", current_time))
+                
+        if history_inserts:
+            await db.executemany("INSERT INTO port_history (mac, port, service, event, timestamp) VALUES (?, ?, ?, ?, ?)", history_inserts)
             
         await db.commit()
         return new_ports
@@ -585,6 +627,26 @@ class DatabaseManager:
             return True
             
         return False
+
+    @classmethod
+    async def queue_deferred_scan(cls, mac: str, ip: str):
+        import time
+        db = await cls.get_db()
+        await db.execute("INSERT OR REPLACE INTO deferred_scans (mac, ip, queued_at) VALUES (?, ?, ?)", (mac, ip, time.time()))
+        await db.commit()
+
+    @classmethod
+    async def get_due_deferred_scans(cls) -> List[Tuple[str, str]]:
+        db = await cls.get_db()
+        cursor = await db.execute("SELECT mac, ip FROM deferred_scans")
+        rows = await cursor.fetchall()
+        return [(r["mac"], r["ip"]) for r in rows]
+
+    @classmethod
+    async def remove_deferred_scan(cls, mac: str):
+        db = await cls.get_db()
+        await db.execute("DELETE FROM deferred_scans WHERE mac = ?", (mac,))
+        await db.commit()
 
     @classmethod
     async def log_latency_sample(cls, target: str, loss_pct: float, jitter_ms: float):

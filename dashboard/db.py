@@ -155,6 +155,18 @@ def get_device_events(mac: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 @st.cache_data(ttl=30)
+def get_device_port_history(mac: str) -> pd.DataFrame:
+    try:
+        with get_connection() as conn:
+            df = pd.read_sql_query("SELECT port, service, event, timestamp FROM port_history WHERE mac = ? ORDER BY timestamp DESC", conn, params=(mac,))
+            if not df.empty:
+                df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+            return df
+    except Exception as e:
+        st.error(f"Database error: {e}")
+        return pd.DataFrame()
+
+@st.cache_data(ttl=30)
 def get_security_posture(days: int = 7) -> dict:
     import time
     try:

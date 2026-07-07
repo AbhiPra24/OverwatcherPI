@@ -81,27 +81,51 @@ async def get_vendor(mac: str) -> str:
         return vendor if vendor else "Unknown"
     return "Unknown"
 
+_consecutive_failures = 0
+_circuit_open_until = 0.0
+
 async def live_lookup_vendor(prefix: str):
     """Live fallback to api.macvendors.com for unknown network prefixes."""
+    global _consecutive_failures, _circuit_open_until
+    import time
+    
+    if time.time() < _circuit_open_until:
+        return None
+        
     url = f"https://api.macvendors.com/{prefix}"
     try:
         from config import config
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=config.macvendors_api_timeout)) as response:
                 if response.status == 200:
+                    _consecutive_failures = 0
                     text = await response.text(encoding="utf-8")
                     return text.strip()
                 elif response.status == 404:
-                    return None
-                elif response.status == 429:
-                    logger.warning(f"macvendors.com rate limited on prefix {prefix}")
+                    # Not an API outage, just not found
+                    _consecutive_failures = 0
                     return None
                 else:
-                    logger.debug(f"macvendors.com returned HTTP {response.status} for {prefix}")
+                    _consecutive_failures += 1
+                    if _consecutive_failures >= 3:
+                        _circuit_open_until = time.time() + 300
+                        logger.warning("macvendors.com API failed 3 times; opening circuit breaker for 5 minutes.")
+                    elif response.status == 429:
+                        logger.warning(f"macvendors.com rate limited on prefix {prefix}")
+                    else:
+                        logger.debug(f"macvendors.com returned HTTP {response.status} for {prefix}")
                     return None
     except asyncio.TimeoutError:
+        _consecutive_failures += 1
+        if _consecutive_failures >= 3:
+            _circuit_open_until = time.time() + 300
+            logger.warning("macvendors.com API timeout 3 times; opening circuit breaker for 5 minutes.")
         logger.debug(f"Timeout querying macvendors.com for {prefix}")
         return None
     except Exception as e:
+        _consecutive_failures += 1
+        if _consecutive_failures >= 3:
+            _circuit_open_until = time.time() + 300
+            logger.warning("macvendors.com API failed 3 times; opening circuit breaker for 5 minutes.")
         logger.debug(f"Exception querying macvendors.com for {prefix}: {e}")
         return None

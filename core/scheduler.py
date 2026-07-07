@@ -54,19 +54,32 @@ async def fast_sweep_job(app: Application):
                 # Targeted Scan
                 open_ports = []
                 try:
-                    # Use fast scan (-F) instead of all ports (-p-) and skip service detection (-sV) 
-                    # so the fast sweep job doesn't hang for an hour on slow IoT devices!
-                    cmd = ["nmap", "-F", "-T4", "--open", d.ip]
-                    process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-                    # Add a timeout so it NEVER hangs forever
-                    stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
-                    if process.returncode == 0:
-                        for line in stdout.decode('utf-8').splitlines():
-                            if "/tcp" in line and "open" in line:
-                                parts = line.split()
-                                port = parts[0].split('/')[0]
-                                service = parts[2] if len(parts) > 2 else "unknown"
-                                open_ports.append(f"{port} ({service})")
+                    from core.scan_limits import get_network_load
+                    current_hour = datetime.now().hour
+                    is_quiet = config.quiet_hours_start <= current_hour < config.quiet_hours_end
+                    if config.quiet_hours_start > config.quiet_hours_end:
+                        is_quiet = current_hour >= config.quiet_hours_start or current_hour < config.quiet_hours_end
+                        
+                    load = get_network_load(app)
+                    
+                    if not is_quiet and load > config.network_jitter_threshold_ms:
+                        logger.info(f"High network load ({load:.1f}ms jitter). Deferring full scan for {d.ip}.")
+                        await DatabaseManager.queue_deferred_scan(d.mac, d.ip)
+                        cmd = ["nmap", "-sn", d.ip]
+                        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                        await asyncio.wait_for(process.communicate(), timeout=30.0)
+                        open_ports.append("Scan deferred (high network load)")
+                    else:
+                        cmd = ["nmap", "-F", "-T4", "--open", d.ip]
+                        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+                        if process.returncode == 0:
+                            for line in stdout.decode('utf-8').splitlines():
+                                if "/tcp" in line and "open" in line:
+                                    parts = line.split()
+                                    port = parts[0].split('/')[0]
+                                    service = parts[2] if len(parts) > 2 else "unknown"
+                                    open_ports.append(f"{port} ({service})")
                 except Exception as e:
                     logger.error(f"Targeted scan failed: {e}")
                 
@@ -91,7 +104,8 @@ async def fast_sweep_job(app: Application):
     for mac in bt_new_macs:
         is_known = await DatabaseManager.is_known(mac)
         if not is_known:
-            name = next((d.name for d in bt_devices if d.address == mac), "Unknown")
+            device = next((d for d in bt_devices if d.address == mac), None)
+            name = device.name if device else "Unknown"
             try:
                 await DatabaseManager.log_event(
                     category="bluetooth",
@@ -101,7 +115,12 @@ async def fast_sweep_job(app: Application):
                 )
                 
                 should_alert = True
-                if name and name != "Unknown":
+                if device and device.fingerprint:
+                    if await DatabaseManager.was_fingerprint_seen_recently(device.fingerprint, hours=24.0):
+                        logger.info(f"Suppressed BLE alert for {mac} ({name}) due to fingerprint recency match.")
+                        should_alert = False
+                        
+                if should_alert and name and name != "Unknown":
                     should_alert = await DatabaseManager.should_alert_ble_vendor(name, config.ble_alert_cooldown_hours)
                     
                 if should_alert:
@@ -412,7 +431,55 @@ def setup_scheduler(app: Application) -> AsyncIOScheduler:
         id="resource_health"
     )
     
+    # Schedule Deferred Scan Job
+    scheduler.add_job(
+        deferred_scan_job,
+        "interval",
+        hours=1,
+        args=[app],
+        id="deferred_scan"
+    )
+    
     return scheduler
+
+async def deferred_scan_job(app: Application):
+    logger.info("Running deferred scan job...")
+    current_hour = datetime.now().hour
+    is_quiet = config.quiet_hours_start <= current_hour < config.quiet_hours_end
+    if config.quiet_hours_start > config.quiet_hours_end:
+        is_quiet = current_hour >= config.quiet_hours_start or current_hour < config.quiet_hours_end
+        
+    if not is_quiet:
+        return
+        
+    scans = await DatabaseManager.get_due_deferred_scans()
+    for mac, ip in scans:
+        logger.info(f"Running deferred scan for {ip}...")
+        open_ports = []
+        try:
+            cmd = ["nmap", "-sV", "-T3", "--open", ip]
+            process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300.0)
+            if process.returncode == 0:
+                for line in stdout.decode('utf-8').splitlines():
+                    if "/tcp" in line and "open" in line:
+                        parts = line.split()
+                        port = parts[0].split('/')[0]
+                        service = parts[2] if len(parts) > 2 else "unknown"
+                        open_ports.append(f"{port} ({service})")
+            
+            ports_str = ", ".join(open_ports) if open_ports else "None found"
+            
+            await broadcast_message(
+                app,
+                text=f"🚨 <b>Deferred Scan Results for:</b> <code>{mac}</code>\n"
+                     f"📡 IP: {ip}\n"
+                     f"🔓 Open Ports: {ports_str}",
+                parse_mode=ParseMode.HTML
+            )
+            await DatabaseManager.remove_deferred_scan(mac)
+        except Exception as e:
+            logger.error(f"Deferred scan failed for {ip}: {e}")
 
 async def port_drift_job(app: Application):
     """Daily job to track open ports on known active devices."""
