@@ -9,6 +9,14 @@
 | `dashboard` | bridge (`internal`) | Only reachable via Caddy — never published to host |
 | `caddy` | bridge (`internal`) | Single public entry point on port 8109 |
 
+### API endpoint (`/api/*`)
+
+The FastAPI server (`uvicorn`) inside `overwatcher-bot` binds **`127.0.0.1:8000` only** — not `0.0.0.0`.  
+Because `bot` uses `network_mode: host`, `127.0.0.1` is the Pi's loopback — it is **not directly reachable from the LAN**.  
+External access goes through Caddy: `http://<pi-ip>:8109/api/devices` (protected by the same basicauth layer as the dashboard) + Bearer token.
+
+> **Never change the uvicorn bind to `0.0.0.0`** without also adding firewall rules — doing so would expose the API directly on the LAN with only the Bearer token as protection.
+
 ## Pre-flight Checklist
 
 1. Install Docker + Docker Compose plugin:
