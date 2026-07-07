@@ -243,6 +243,14 @@ class DatabaseManager:
                 last_run_at REAL
             )
         """)
+        
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS device_maintenance (
+                mac TEXT PRIMARY KEY,
+                until_timestamp REAL NOT NULL,
+                reason TEXT
+            )
+        """)
             
         cursor = await db.execute("PRAGMA table_info(bt_devices)")
         cols = [row["name"] for row in await cursor.fetchall()]
@@ -753,3 +761,27 @@ class DatabaseManager:
             LIMIT ?
         """, (ip, limit))
         return [dict(row) for row in await cursor.fetchall()]
+
+    @classmethod
+    async def set_maintenance(cls, mac: str, hours: float, reason: str = ""):
+        import time
+        db = await cls.get_db()
+        if hours <= 0:
+            await db.execute("DELETE FROM device_maintenance WHERE mac = ?", (mac,))
+        else:
+            until = time.time() + (hours * 3600)
+            await db.execute(
+                "INSERT INTO device_maintenance (mac, until_timestamp, reason) VALUES (?, ?, ?) ON CONFLICT(mac) DO UPDATE SET until_timestamp = excluded.until_timestamp, reason = excluded.reason",
+                (mac, until, reason)
+            )
+        await db.commit()
+
+    @classmethod
+    async def is_in_maintenance(cls, mac: str) -> bool:
+        import time
+        db = await cls.get_db()
+        cursor = await db.execute("SELECT until_timestamp FROM device_maintenance WHERE mac = ?", (mac,))
+        row = await cursor.fetchone()
+        if row and row["until_timestamp"] > time.time():
+            return True
+        return False

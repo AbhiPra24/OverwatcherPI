@@ -37,6 +37,7 @@ def setup_application(post_init_hook=None):
             BotCommand("unmonitor", "Remove host from ping monitor"),
             BotCommand("dns", "View recent DNS queries for host"),
             BotCommand("name", "Assign friendly name to device"),
+            BotCommand("maintenance", "Mute alerts for device"),
             BotCommand("export", "Export database to CSV"),
             BotCommand("logs", "Fetch systemd logs")
         ])
@@ -71,6 +72,7 @@ def setup_application(post_init_hook=None):
     app.add_handler(CommandHandler("dns", handlers.dns_handler))
     app.add_handler(CommandHandler("traceroute", handlers.traceroute_handler))
     app.add_handler(CommandHandler("name", handlers.name_handler))
+    app.add_handler(CommandHandler("maintenance", handlers.maintenance_handler))
     app.add_handler(CommandHandler("export", handlers.export_handler))
     app.add_handler(CommandHandler("logs", handlers.logs_handler))
     app.add_handler(CommandHandler("attacker", handlers.attacker_handler))

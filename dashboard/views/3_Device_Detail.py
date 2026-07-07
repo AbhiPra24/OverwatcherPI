@@ -23,6 +23,10 @@ bt_device = bt_df[bt_df['address'] == mac] if not bt_df.empty else pd.DataFrame(
 
 col1, col2 = st.columns(2)
 
+maintenance_info = db.get_device_maintenance(mac)
+if maintenance_info:
+    st.warning(f"🔇 **Device is in Maintenance Mode** until {pd.to_datetime(maintenance_info['until_timestamp'], unit='s')}. Reason: {maintenance_info['reason']}")
+
 with col1:
     st.markdown("### Network Info")
     if not net_device.empty:

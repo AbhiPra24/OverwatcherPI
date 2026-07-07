@@ -85,13 +85,15 @@ async def fast_sweep_job(app: Application):
                 
                 ports_str = ", ".join(open_ports) if open_ports else "None found"
                 try:
-                    await broadcast_message(
-                        app,
-                        text=f"🚨 <b>Unknown device joined the network:</b> {d.vendor} (MAC: <code>{d.mac}</code>)\n"
-                             f"📡 IP: {d.ip}\n"
-                             f"🔓 Open Ports: {ports_str}",
-                        parse_mode=ParseMode.HTML
-                    )
+                    is_maint = await DatabaseManager.is_in_maintenance(d.mac)
+                    if not is_maint:
+                        await broadcast_message(
+                            app,
+                            text=f"🚨 <b>Unknown device joined the network:</b> {d.vendor} (MAC: <code>{d.mac}</code>)\n"
+                                 f"📡 IP: {d.ip}\n"
+                                 f"🔓 Open Ports: {ports_str}",
+                            parse_mode=ParseMode.HTML
+                        )
                     await DatabaseManager.log_event(
                         category="network",
                         severity="warning",
@@ -123,7 +125,8 @@ async def fast_sweep_job(app: Application):
                 if should_alert and name and name != "Unknown":
                     should_alert = await DatabaseManager.should_alert_ble_vendor(name, config.ble_alert_cooldown_hours)
                     
-                if should_alert:
+                is_maint = await DatabaseManager.is_in_maintenance(mac)
+                if should_alert and not is_maint:
                     await broadcast_message(
                         app,
                         text=f"🚨 <b>Unknown Bluetooth device detected:</b> {name} (MAC: <code>{mac}</code>)",
@@ -512,13 +515,15 @@ async def deferred_scan_job(app: Application):
             
             ports_str = ", ".join(open_ports) if open_ports else "None found"
             
-            await broadcast_message(
-                app,
-                text=f"🚨 <b>Deferred Scan Results for:</b> <code>{mac}</code>\n"
-                     f"📡 IP: {ip}\n"
-                     f"🔓 Open Ports: {ports_str}",
-                parse_mode=ParseMode.HTML
-            )
+            is_maint = await DatabaseManager.is_in_maintenance(mac)
+            if not is_maint:
+                await broadcast_message(
+                    app,
+                    text=f"🚨 <b>Deferred Scan Results for:</b> <code>{mac}</code>\n"
+                         f"📡 IP: {ip}\n"
+                         f"🔓 Open Ports: {ports_str}",
+                    parse_mode=ParseMode.HTML
+                )
             await DatabaseManager.remove_deferred_scan(mac)
         except Exception as e:
             logger.error(f"Deferred scan failed for {ip}: {e}")
@@ -552,11 +557,13 @@ async def port_drift_job(app: Application):
                 # Alert only if it's a known device that opened a new port
                 ports_str = ", ".join([f"{p['port']} ({p['service']})" for p in new_ports])
                 try:
-                    await broadcast_message(
-                        app,
-                        text=f"🚨 <b>Port Drift Alert:</b> <code>{d.mac}</code> ({d.hostname or d.vendor}) just opened new port(s): {ports_str} — wasn't open last scan.",
-                        parse_mode=ParseMode.HTML
-                    )
+                    is_maint = await DatabaseManager.is_in_maintenance(d.mac)
+                    if not is_maint:
+                        await broadcast_message(
+                            app,
+                            text=f"🚨 <b>Port Drift Alert:</b> <code>{d.mac}</code> ({d.hostname or d.vendor}) just opened new port(s): {ports_str} — wasn't open last scan.",
+                            parse_mode=ParseMode.HTML
+                        )
                     await DatabaseManager.log_event(
                         category="network",
                         severity="warning",

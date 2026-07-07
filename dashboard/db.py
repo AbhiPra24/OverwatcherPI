@@ -208,3 +208,14 @@ def get_security_posture(days: int = 7) -> dict:
     except Exception as e:
         st.error(f"Database error: {e}")
         return {}
+
+def get_device_maintenance(mac: str) -> dict:
+    try:
+        with get_connection() as conn:
+            cur = conn.execute("SELECT until_timestamp, reason FROM device_maintenance WHERE mac = ?", (mac,))
+            row = cur.fetchone()
+            if row and row[0] > time.time():
+                return {"until_timestamp": row[0], "reason": row[1]}
+    except Exception:
+        pass
+    return {}

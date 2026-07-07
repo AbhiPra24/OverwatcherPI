@@ -199,6 +199,37 @@ async def name_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"⚠️ MAC {mac} not found in database.")
 
 @auth_required
+async def maintenance_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args or len(context.args) < 2:
+        await update.message.reply_text("Usage: /maintenance <mac> <hours|off> [reason]")
+        return
+    mac = context.args[0].upper()
+    if not re.match(r"^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$", mac):
+        await update.message.reply_text("❌ That doesn't look like a valid MAC address.")
+        return
+        
+    duration_str = context.args[1].lower()
+    reason = " ".join(context.args[2:]) if len(context.args) > 2 else ""
+    
+    if duration_str == "off":
+        await DatabaseManager.set_maintenance(mac, 0, "")
+        await update.message.reply_text(f"✅ Cleared maintenance mode for {mac}")
+    else:
+        try:
+            hours = float(duration_str)
+            if hours <= 0:
+                raise ValueError()
+        except ValueError:
+            await update.message.reply_text("❌ Duration must be 'off' or a positive number of hours.")
+            return
+            
+        await DatabaseManager.set_maintenance(mac, hours, reason)
+        msg = f"✅ Device {mac} placed in maintenance for {hours} hours."
+        if reason:
+            msg += f" (Reason: {reason})"
+        await update.message.reply_text(msg)
+
+@auth_required
 async def attacker_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Please provide an IP: /attacker 8.8.8.8")
