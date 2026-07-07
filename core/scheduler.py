@@ -47,9 +47,12 @@ async def fast_sweep_job(app: Application):
                 # Targeted Scan
                 open_ports = []
                 try:
-                    cmd = ["nmap", "-sV", "-p-", "-T4", "--open", d.ip]
+                    # Use fast scan (-F) instead of all ports (-p-) and skip service detection (-sV) 
+                    # so the fast sweep job doesn't hang for an hour on slow IoT devices!
+                    cmd = ["nmap", "-F", "-T4", "--open", d.ip]
                     process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-                    stdout, stderr = await process.communicate()
+                    # Add a timeout so it NEVER hangs forever
+                    stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
                     if process.returncode == 0:
                         for line in stdout.decode('utf-8').splitlines():
                             if "/tcp" in line and "open" in line:
