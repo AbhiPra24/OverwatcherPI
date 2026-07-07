@@ -10,10 +10,10 @@ fi
 
 source "$SCRIPT_DIR/venv/bin/activate"
 
-nohup streamlit run "$SCRIPT_DIR/app.py" --server.address 0.0.0.0 --server.port 8501 --server.headless true > "$SCRIPT_DIR/dashboard.log" 2>&1 &
+nohup streamlit run "$SCRIPT_DIR/app.py" --server.address 0.0.0.0 --server.port 8109 --server.headless true > "$SCRIPT_DIR/dashboard.log" 2>&1 &
 PID=$!
 echo $PID > "$SCRIPT_DIR/dashboard.pid"
 
 LAN_IP=$(hostname -I | awk '{print $1}')
 echo "Dashboard started in background (PID $PID)."
-echo "Access it on your LAN at: http://$LAN_IP:8501"
+echo "Access it on your LAN at: http://$LAN_IP:8109"
