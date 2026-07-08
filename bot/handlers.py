@@ -9,8 +9,9 @@ from bot.middleware import auth_required
 from bot import formatters
 from utils import metrics
 from utils.osint import get_ip_info
-from scanners import network, bluetooth
 from core.database import DatabaseManager
+from config import config
+from core.job_queue import JobQueue
 from core.scan_limits import SCAN_LOCK
 import time
 
@@ -330,7 +331,12 @@ async def traceroute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await proc.communicate()
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await msg.edit_text("❌ Traceroute timed out after 30 seconds.")
+            return
         
         output = stdout.decode('utf-8', errors='ignore')[:3800]
         if not output.strip():
@@ -373,57 +379,226 @@ async def export_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         rows = await cursor.fetchall()
         
         fd, path = tempfile.mkstemp(suffix=".csv")
-        with os.fdopen(fd, 'w', newline='', encoding='utf-8') as f:
-            if rows:
-                writer = csv.DictWriter(f, fieldnames=rows[0].keys())
-                writer.writeheader()
-                for row in rows:
-                    writer.writerow(dict(row))
+        os.close(fd)
         
-        await update.message.reply_document(document=open(path, 'rb'), filename="network_devices.csv")
+        with open(path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(['MAC', 'IP', 'Vendor', 'Hostname', 'Known', 'First Seen', 'Last Seen', 'Active'])
+            for row in rows:
+                writer.writerow(row)
+                
+        await msg.edit_text("✅ Export complete!")
+        with open(path, 'rb') as f:
+            await update.message.reply_document(
+                document=f,
+                filename=f"overwatcher_devices_{int(time.time())}.csv"
+            )
         os.remove(path)
-        await msg.delete()
     except Exception as e:
         await msg.edit_text(f"❌ Export failed: {e}")
 
 @auth_required
 async def logs_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("Usage: /logs <service> [lines]\nValid services: overwatcher, overwatcher-sniffer, overwatcher-dashboard")
-        return
-        
-    service = context.args[0]
-    allowed = ["overwatcher", "overwatcher-sniffer", "overwatcher-dashboard"]
-    if service not in allowed:
-        await update.message.reply_text(f"❌ Invalid service. Allowed: {', '.join(allowed)}")
-        return
-        
     lines = "50"
-    if len(context.args) > 1 and context.args[1].isdigit():
-        lines = context.args[1]
+    if context.args and context.args[0].isdigit():
+        lines = context.args[0]
         
-    msg = await update.message.reply_text(f"📋 <i>Fetching logs for {service}...</i>", parse_mode=ParseMode.HTML)
+    msg = await update.message.reply_text(f"📋 <i>Fetching logs...</i>", parse_mode=ParseMode.HTML)
     try:
         proc = await asyncio.create_subprocess_exec(
-            "journalctl", "-u", service, "-n", lines, "--no-pager",
+            "tail", "-n", lines, "logs/overwatcher.log",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, _ = await proc.communicate()
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await msg.edit_text("❌ Logs fetch timed out after 30 seconds.")
+            return
         
         output = stdout.decode('utf-8', errors='ignore')
         if not output.strip():
-            await msg.edit_text(f"<i>No logs found for {service}.</i>", parse_mode=ParseMode.HTML)
+            output = stderr.decode('utf-8', errors='ignore')
+        if not output.strip():
+            await msg.edit_text(f"<i>No logs found.</i>", parse_mode=ParseMode.HTML)
             return
             
         if len(output) > 3800:
             fd, path = tempfile.mkstemp(suffix=".log")
             with os.fdopen(fd, 'w', encoding='utf-8') as f:
                 f.write(output)
-            await update.message.reply_document(document=open(path, 'rb'), filename=f"{service}.log")
+            await update.message.reply_document(document=open(path, 'rb'), filename="overwatcher.log")
             os.remove(path)
             await msg.delete()
         else:
-            await msg.edit_text(f"<b>Logs for {service}</b>:\n<pre>{formatters.escape(output)}</pre>", parse_mode=ParseMode.HTML)
+            await msg.edit_text(f"<b>Logs</b>:\n<pre>{formatters.escape(output)}</pre>", parse_mode=ParseMode.HTML)
     except Exception as e:
         await msg.edit_text(f"❌ Failed to fetch logs: {e}")
+
+@auth_required
+async def jobs_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db = await DatabaseManager.get_db()
+    cur = await db.execute("SELECT id, job_type, target, status FROM jobs ORDER BY created_at DESC LIMIT 10")
+    rows = await cur.fetchall()
+    if not rows:
+        await update.message.reply_text("No recent jobs.")
+        return
+    
+    msg = "📋 <b>Recent Jobs:</b>\n\n"
+    for r in rows:
+        msg += f"• <code>{r['id']}</code> [{r['status']}]: {r['job_type']} {formatters.escape(r['target'])}\n"
+    await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
+
+@auth_required
+async def job_detail_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /job <id>")
+        return
+    job_id = context.args[0]
+    db = await DatabaseManager.get_db()
+    cur = await db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
+    row = await cur.fetchone()
+    if not row:
+        await update.message.reply_text(f"Job {job_id} not found.")
+        return
+        
+    msg = f"<b>Job:</b> <code>{row['id']}</code>\n<b>Status:</b> {row['status']}\n<b>Type:</b> <code>{row['job_type']}</code>\n<b>Target:</b> <code>{formatters.escape(row['target'])}</code>\n"
+    await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
+
+@auth_required
+async def canceljob_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /canceljob <id>")
+        return
+    job_id = context.args[0]
+    success = await JobQueue.cancel_job(job_id)
+    if success:
+        await update.message.reply_text(f"✅ Job {job_id} cancelled.")
+    else:
+        await update.message.reply_text(f"❌ Could not cancel job {job_id}.")
+
+@auth_required
+async def health_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    import os
+    import time
+    msg = []
+    
+    db_path = config.db_path
+    if os.path.exists(db_path):
+        db_size_mb = os.path.getsize(db_path) / (1024 * 1024)
+        msg.append(f"📦 <b>DB Size:</b> {db_size_mb:.2f} MB")
+    
+    stat = os.statvfs('/')
+    free_space_gb = (stat.f_bavail * stat.f_frsize) / (1024**3)
+    total_space_gb = (stat.f_blocks * stat.f_frsize) / (1024**3)
+    msg.append(f"💾 <b>Disk Free:</b> {free_space_gb:.2f} GB / {total_space_gb:.2f} GB")
+    
+    try:
+        ps_count = len([d for d in os.listdir('/proc') if d.isdigit()])
+        msg.append(f"🐳 <b>Container procs:</b> {ps_count}")
+    except Exception:
+        pass
+        
+    db = await DatabaseManager.get_db()
+    cur = await db.execute("SELECT job_name, last_run_at FROM job_heartbeats")
+    rows = await cur.fetchall()
+    if rows:
+        msg.append("\n⏱️ <b>Heartbeats:</b>")
+        now = time.time()
+        for r in rows:
+            age = now - r["last_run_at"]
+            msg.append(f"  - {r['job_name']}: {age:.1f}s ago")
+            
+    await update.message.reply_text("\n".join(msg) if msg else "Health info unavailable.", parse_mode=ParseMode.HTML)
+
+@auth_required
+async def snooze_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("Usage: /snooze <mac> <hours>\nMutes alerts for this device.")
+        return
+    
+    mac = context.args[0].lower()
+    try:
+        hours = float(context.args[1])
+    except ValueError:
+        await update.message.reply_text("❌ Hours must be a number.")
+        return
+        
+    until_ts = time.time() + (hours * 3600)
+    await DatabaseManager.set_device_maintenance(mac, until_ts, f"Snoozed by user via TG for {hours}h")
+    await update.message.reply_text(f"✅ Alerts for <code>{mac}</code> muted for {hours} hours.", parse_mode=ParseMode.HTML)
+
+@auth_required
+async def nmap_full_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /nmap_full <target>")
+        return
+    target = context.args[0]
+    # Basic sanitize
+    if not re.match(r'^[a-zA-Z0-9.-]+$', target):
+        await update.message.reply_text("Invalid target.")
+        return
+    
+    chat_id = update.effective_chat.id
+    job_id = await JobQueue.add_job(f"nmap -A {target}", chat_id)
+    await update.message.reply_text(f"✅ Enqueued full nmap scan as job `{job_id}`.", parse_mode=ParseMode.MARKDOWN)
+
+@auth_required
+async def sherlock_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /sherlock <username>")
+        return
+    username = context.args[0]
+    if not re.match(r'^[a-zA-Z0-9_-]+$', username):
+        await update.message.reply_text("Invalid username.")
+        return
+        
+    chat_id = update.effective_chat.id
+    # We will use sherlock-project/sherlock or similar via python if installed, 
+    # but the task says to run 'sherlock <username>'. Assuming sherlock is installed or we can run it.
+    job_id = await JobQueue.add_job(f"sherlock {username}", chat_id)
+    await update.message.reply_text(f"✅ Enqueued sherlock scan as job `{job_id}`.", parse_mode=ParseMode.MARKDOWN)
+
+@auth_required
+async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = """
+🛡️ *OverwatcherPI Bot Help & Documentation* 🛡️
+
+Here is a detailed list of available commands and what they do:
+
+*Core Network:*
+• `/status` - View general system health, CPU/RAM, disk usage, and container stats.
+• `/network` - Scans the local subnet for active devices using ARP and reports a quick summary.
+• `/dns [mac_or_ip]` - Displays the recent DNS queries made by a specific device to track its activity.
+• `/speedtest` - Runs an internet speed test (requires some time).
+
+*OSINT & Active Security:*
+• `/nmap_full <target>` - Enqueues a full deep `nmap -A` scan against an IP or hostname. Runs in the background.
+• `/sherlock <username>` - Enqueues an OSINT sweep for social media profiles using Sherlock. Runs in the background.
+• `/attacker <ip>` - Runs a WHOIS and threat intelligence lookup on an external IP.
+• `/traceroute <ip>` - Runs a traceroute to see network hops.
+
+*Device Management:*
+• `/name <mac> <friendly_name>` - Give a custom human-readable name to a device on your network.
+• `/whitelist <mac>` - Mark a device as known/safe.
+• `/monitor <ip/mac>` - Pin a host to the ping monitor dashboard.
+• `/unmonitor <ip/mac>` - Remove a pinned host.
+
+*Alert Control:*
+• `/maintenance <mac>` - Mute all alerts for a device permanently (until un-muted).
+• `/snooze <mac> <hours>` - Mute alerts for a device for a specific duration.
+
+*Background Jobs:*
+• `/jobs` - List the 10 most recent background jobs and their status.
+• `/job <id>` - Get detailed status and outputs of a specific job.
+• `/canceljob <id>` - Abort a running background job.
+
+*Admin:*
+• `/export` - Export the current network tracking database as a CSV file.
+• `/health` - Detailed internal diagnostics (job heartbeats, DB size, etc.).
+• `/logs` - View the last 50 lines of the OverwatcherPI system log.
+
+_Tip: Use the Dashboard for interactive visualizations and timeline views!_
+"""
+    await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)

@@ -39,10 +39,12 @@ trends = st.Page("views/5_Trends.py", title="Trends", icon="📈")
 device_history = st.Page("views/1_Device_History.py", title="Device History", icon="📖")
 device_detail = st.Page("views/3_Device_Detail.py", title="Device Detail", icon="🔍")
 
-alerts = st.Page("views/2_Alerts.py", title="Alerts & Events", icon="🚨")
+alerts = st.Page("views/6_Alerts.py", title="System Alerts", icon="🚨")
+threat_map = st.Page("views/4_Threat_Map.py", title="Threat Map", icon="🗺️")
+timeline = st.Page("views/5_Timeline.py", title="Timeline", icon="⏱️")
 
 pg = st.navigation({
-    "Dashboard": [overview, security, trends],
+    "Dashboard": [overview, security, trends, threat_map, timeline],
     "Devices": [device_history, device_detail],
     "Logs": [alerts]
 })

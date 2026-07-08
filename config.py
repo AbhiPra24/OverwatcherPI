@@ -82,5 +82,17 @@ class Settings(BaseSettings):
             return [x.strip() for x in v.split(",") if x.strip()]
         return v
 
+class ConfigProxy:
+    def __init__(self):
+        self._settings = None
+
+    def _get_settings(self):
+        if self._settings is None:
+            self._settings = Settings()
+        return self._settings
+
+    def __getattr__(self, name):
+        return getattr(self._get_settings(), name)
+
 # Singleton instance for the application
-config = Settings()
+config = ConfigProxy()

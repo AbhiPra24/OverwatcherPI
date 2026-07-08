@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from dashboard import db
+from core import threat_intel
 
 st.title("🔒 Security Posture")
 
@@ -37,19 +38,43 @@ def render_posture():
                  delta_color="inverse" if posture['ssh_events_weekly'] > 0 else "normal")
 
     st.divider()
-    st.subheader(f"Recent Security Events (Last {days} Days)")
+    st.subheader("Threat Intel Feeds Status")
+    try:
+        stats = threat_intel.get_stats()
+        tcol1, tcol2, tcol3 = st.columns(3)
+        tcol1.metric("Blocked Domains", stats.get("blocked_domains_count", 0))
+        tcol2.metric("Blocked IPs", stats.get("blocked_ips_count", 0))
+        last_refresh = stats.get("last_refresh")
+        tcol3.metric("Last Refresh", last_refresh.strftime("%Y-%m-%d %H:%M:%S") if last_refresh else "Never")
+    except AttributeError:
+        st.info("Threat Intel stats are currently being updated by the backend.")
+    except Exception as e:
+        st.error(f"Error loading Threat Intel stats: {e}")
 
-    events_df = db.get_events(limit=500, category="security")
+    st.divider()
+    st.subheader(f"Recent Security & Scan Events (Last {days} Days)")
+
+    # Fetch events without category filter to ensure we get both security and scan events
+    events_df = db.get_events(limit=1000)
+    
     if not events_df.empty:
-        def color_severity(val):
-            if val in ['high', 'critical']: return 'color: red'
-            if val == 'warning': return 'color: orange'
-            if val == 'info': return 'color: green'
-            return 'color: inherit'
-            
-        styled_df = events_df[['datetime', 'severity', 'message', 'related_id']].style.map(color_severity, subset=['severity'])
-        st.dataframe(styled_df, width="stretch", hide_index=True)
+        scan_events_df = events_df[
+            events_df['message'].str.contains('Scan Detected', na=False, case=False) |
+            (events_df['category'] == 'security')
+        ]
+        
+        if not scan_events_df.empty:
+            def color_severity(val):
+                if val in ['high', 'critical']: return 'color: red'
+                if val == 'warning': return 'color: orange'
+                if val == 'info': return 'color: green'
+                return 'color: inherit'
+                
+            styled_df = scan_events_df[['datetime', 'category', 'severity', 'message', 'related_id']].style.map(color_severity, subset=['severity'])
+            st.dataframe(styled_df, width="stretch", hide_index=True)
+        else:
+            st.success(f"No security or scan events found in the last {days} days. Your network is quiet!")
     else:
-        st.success(f"No security events found in the last {days} days. Your network is quiet!")
+        st.success(f"No security or scan events found in the last {days} days. Your network is quiet!")
 
 render_posture()

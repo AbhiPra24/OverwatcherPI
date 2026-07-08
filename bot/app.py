@@ -38,8 +38,15 @@ def setup_application(post_init_hook=None):
             BotCommand("dns", "View recent DNS queries for host"),
             BotCommand("name", "Assign friendly name to device"),
             BotCommand("maintenance", "Mute alerts for device"),
-            BotCommand("export", "Export database to CSV"),
-            BotCommand("logs", "Fetch systemd logs")
+            BotCommand("snooze", "Mute alerts for a device (hours)"),
+            BotCommand("export", "Export database as CSV"),
+            BotCommand("jobs", "List recent and running jobs"),
+            BotCommand("job", "Show job details"),
+            BotCommand("canceljob", "Cancel a running or queued job"),
+            BotCommand("health", "Show container health and system info"),
+            BotCommand("help", "Detailed list of all commands and usage"),
+            BotCommand("nmap_full", "Run full nmap scan on target"),
+            BotCommand("sherlock", "Run OSINT on username"),
         ])
         
         import asyncio
@@ -54,8 +61,12 @@ def setup_application(post_init_hook=None):
                 logger.warning("SSH watcher exited. Restarting in 10s...")
                 await asyncio.sleep(10)
                 
-        task = asyncio.create_task(supervisor())
-        app.bot_data["ssh_watcher_task"] = task
+        ssh_watcher_task = asyncio.create_task(supervisor())
+        app.bot_data["ssh_watcher_task"] = ssh_watcher_task
+        
+        from core.job_queue import job_worker
+        job_worker_task = asyncio.create_task(job_worker(app))
+        app.bot_data["job_worker_task"] = job_worker_task
         
     builder.post_init(internal_post_init)
         
@@ -76,6 +87,15 @@ def setup_application(post_init_hook=None):
     app.add_handler(CommandHandler("export", handlers.export_handler))
     app.add_handler(CommandHandler("logs", handlers.logs_handler))
     app.add_handler(CommandHandler("attacker", handlers.attacker_handler))
+    
+    app.add_handler(CommandHandler("jobs", handlers.jobs_handler))
+    app.add_handler(CommandHandler("job", handlers.job_detail_handler))
+    app.add_handler(CommandHandler("canceljob", handlers.canceljob_handler))
+    app.add_handler(CommandHandler("health", handlers.health_handler))
+    app.add_handler(CommandHandler("help", handlers.help_handler))
+    app.add_handler(CommandHandler("snooze", handlers.snooze_handler))
+    app.add_handler(CommandHandler("nmap_full", handlers.nmap_full_handler))
+    app.add_handler(CommandHandler("sherlock", handlers.sherlock_handler))
     
     from telegram.ext import CallbackQueryHandler
     app.add_handler(CallbackQueryHandler(handlers.callback_query_handler))

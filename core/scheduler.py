@@ -385,12 +385,12 @@ def setup_scheduler(app: Application) -> AsyncIOScheduler:
         id="oui_refresh"
     )
     
-    # Schedule Threat Intel refresh (weekly)
+    # Schedule Threat Intel refresh (daily)
     from core import threat_intel
     scheduler.add_job(
         threat_intel.load_or_refresh,
         "interval",
-        hours=168,
+        hours=24,
         args=[True],  # force=True
         id="threat_intel_refresh"
     )

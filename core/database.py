@@ -180,6 +180,22 @@ class DatabaseManager:
         """)
         
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY,
+                job_type TEXT,
+                target TEXT,
+                status TEXT,
+                requester_chat_id INTEGER,
+                created_at REAL,
+                started_at REAL,
+                finished_at REAL,
+                result_summary TEXT,
+                result_path TEXT,
+                error TEXT
+            )
+        """)
+        
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS ble_alert_cooldown (
                 vendor_key TEXT PRIMARY KEY,
                 last_alert_at REAL NOT NULL

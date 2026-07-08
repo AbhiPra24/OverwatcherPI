@@ -6,10 +6,11 @@ from datetime import datetime
 import time
 from config import config
 
-st.title("🛡 OverwatcherPI Live Overview")
+st.title("Network Overview")
+st.query_params.update({"view": "overview"})
 
-@st.fragment(run_every="30s")
-def live_overview():
+@st.fragment(run_every=30)
+def overview_metrics():
     col1, col2 = st.columns(2)
     
     def format_vendor(v):

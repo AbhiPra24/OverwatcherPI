@@ -156,15 +156,26 @@ flowchart TD
 
 ### 🐳 Docker (Recommended)
 
-**Pre-flight:**
+**Fresh Deploy Quickstart:**
 ```bash
-# 1. Configure .env
-cp .env.example .env
-nano .env   # set TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_IDS, SNIFFER_INTERFACE, API_TOKEN
+# 1. Clone the repository
+git clone https://github.com/AbhiPra24/OverwatcherPI.git
+cd OverwatcherPI
 
-# 2. Generate Caddy password hash
+# 2. Configure environment
+cp .env.example .env
+# Edit .env and set your secrets (TELEGRAM_BOT_TOKEN, DASHBOARD_PASSWORD, API_TOKEN, etc.)
+nano .env
+
+# 3. Validate configuration
+python3 scripts/check_env.py
+
+# 4. Generate Caddy password hash and update dashboard/Caddyfile
 docker run --rm caddy:2-alpine caddy hash-password
-# Paste the output into dashboard/Caddyfile
+
+# 5. Start the stack
+docker compose up -d
+docker compose logs -f   # watch startup
 ```
 
 **Start:**

@@ -1,7 +1,7 @@
-import asyncio
 import logging
 import aiohttp
-from typing import Set, Tuple, Dict
+from datetime import datetime
+from typing import Set, Tuple, Dict, Optional
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 # Two sets to hold our parsed threat intel
 BLOCKED_DOMAINS: Set[str] = set()
 BLOCKED_IPS: Set[str] = set()
+LAST_REFRESH: Optional[datetime] = None
 
 # Maltrail-inspired feed registry
 # Types: 
@@ -91,7 +92,7 @@ async def load_or_refresh(force: bool = False):
     if not config.threat_intel_enabled:
         return
         
-    global BLOCKED_DOMAINS, BLOCKED_IPS
+    global BLOCKED_DOMAINS, BLOCKED_IPS, LAST_REFRESH
     if BLOCKED_DOMAINS and not force:
         logger.info(f"Threat Intel already populated with {len(BLOCKED_DOMAINS)} domains and {len(BLOCKED_IPS)} IPs.")
         return
@@ -112,6 +113,7 @@ async def load_or_refresh(force: bool = False):
                 
     BLOCKED_DOMAINS = new_domains
     BLOCKED_IPS = new_ips
+    LAST_REFRESH = datetime.now()
     
     logger.info(f"Threat Intel combined: {len(BLOCKED_DOMAINS)} domains, {len(BLOCKED_IPS)} IPs.")
 
@@ -120,3 +122,10 @@ def is_domain_blocked(domain: str) -> bool:
     
 def is_ip_blocked(ip: str) -> bool:
     return ip in BLOCKED_IPS
+
+def get_stats() -> dict:
+    return {
+        "last_refresh": LAST_REFRESH,
+        "blocked_domains_count": len(BLOCKED_DOMAINS),
+        "blocked_ips_count": len(BLOCKED_IPS)
+    }

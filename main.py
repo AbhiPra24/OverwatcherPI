@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import signal
 from telegram.ext import Application
 
 from config import config
@@ -34,7 +35,7 @@ async def _post_init(app: Application) -> None:
 
     # 4. Start API Server (binds 127.0.0.1 only — Caddy proxies /api/* to it)
     from api.server import start_api_server
-    asyncio.create_task(start_api_server())
+    app.bot_data["api_task"] = asyncio.create_task(start_api_server())
     logging.getLogger(__name__).info("FastAPI server starting...")
 
     # 5. Boot notification
@@ -60,28 +61,63 @@ async def _post_init(app: Application) -> None:
     # 6. Honeypot service
     if config.honeypot_enabled:
         from core import honeypot
-        asyncio.create_task(honeypot.start_honeypots(app))
+        app.bot_data["honeypot_task"] = asyncio.create_task(honeypot.start_honeypots(app))
 
 
-def main():
+async def run_bot():
     setup_logging()
     logger = logging.getLogger(__name__)
     
     logger.info("Initializing OverwatcherPI Daemon...")
+    app = setup_application(post_init_hook=_post_init)
     
+    stop_event = asyncio.Event()
+    
+    def shutdown_handler():
+        logger.info("Shutdown signal received.")
+        stop_event.set()
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, shutdown_handler)
+        
     try:
-        app = setup_application(post_init_hook=_post_init)
-        logger.info("Starting Telegram Bot polling...")
-        # drop_pending_updates prevents replaying old commands after restart
-        app.run_polling(drop_pending_updates=True)
-    except KeyboardInterrupt:
-        logger.info("Shutdown requested.")
+        async with app:
+            logger.info("Starting Telegram Bot polling...")
+            await app.start()
+            await app.updater.start_polling(drop_pending_updates=True)
+            
+            await stop_event.wait()
+            
+            logger.info("Stopping polling...")
+            await app.updater.stop()
+            await app.stop()
+            
+            logger.info("Cancelling background tasks...")
+            for task_name in ["ssh_watcher_task", "api_task", "honeypot_task", "job_worker_task"]:
+                task = app.bot_data.get(task_name)
+                if task and not task.done():
+                    task.cancel()
+                    
+            # Flush DNS watcher buffers
+            dns_watcher = app.bot_data.get("dns_watcher")
+            if dns_watcher and hasattr(dns_watcher, "_batch") and dns_watcher._batch:
+                logger.info("Flushing DNS watcher buffers...")
+                try:
+                    await DatabaseManager.insert_dns_queries(dns_watcher._batch)
+                    dns_watcher._batch.clear()
+                except Exception as e:
+                    logger.error(f"Failed to flush DNS queries: {e}")
+                    
     except Exception as e:
         logger.exception("Critical error in main loop")
     finally:
-        # DB cleanup is handled effectively by OS on exit, but we can explicitly clean up
-        asyncio.run(DatabaseManager.close())
+        await DatabaseManager.close()
         logger.info("OverwatcherPI shutdown complete.")
+
+
+def main():
+    asyncio.run(run_bot())
 
 
 if __name__ == "__main__":
