@@ -166,7 +166,6 @@ async def scheduled_speedtest_job(app: Application):
         st = speedtest.Speedtest()
         
         st.get_servers()
-        st.get_best_server(st.get_servers())
         server = st.get_best_server()
         ping = server.get("latency", 0)
         
