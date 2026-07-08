@@ -92,4 +92,4 @@ def overview_metrics():
             
     st.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
 
-live_overview()
+overview_metrics()

@@ -3,3 +3,5 @@ pandas
 psutil
 pydantic
 pydantic-settings
+aiohttp
+requests
