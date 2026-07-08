@@ -36,8 +36,19 @@ async def main():
     # Load DNS blocklist if enabled
     await threat_intel.load_or_refresh()
     
+    import signal
     loop = asyncio.get_running_loop()
     
+    shutdown_flag = False
+    
+    def shutdown_handler():
+        nonlocal shutdown_flag
+        logger.info("Sniffer received shutdown signal.")
+        shutdown_flag = True
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, shutdown_handler)
+        
     scan_detector = None
     if config.syn_scan_detection_enabled:
         from core.scan_detector import ScanDetector
@@ -64,11 +75,25 @@ async def main():
         
     logger.info(f"Starting passive sniffer on interface '{config.sniffer_interface}' with filter '{bpf_filter}'...")
     
+    def stop_filter(p):
+        return shutdown_flag
+
     try:
-        # Sniff in a thread so it doesn't block asyncio loop
-        await asyncio.to_thread(scapy.sniff, iface=config.sniffer_interface, filter=bpf_filter, prn=packet_callback, store=0)
+        while not shutdown_flag:
+            await asyncio.to_thread(scapy.sniff, iface=config.sniffer_interface, filter=bpf_filter, prn=packet_callback, store=0, stop_filter=stop_filter, timeout=2)
     except Exception as e:
         logger.error(f"Sniffer crashed: {e}")
+    finally:
+        if hasattr(dns_watcher, "_batch") and dns_watcher._batch:
+            logger.info("Flushing DNS watcher buffers before shutdown...")
+            try:
+                from core.database import DatabaseManager
+                await DatabaseManager.get_db()
+                await DatabaseManager.insert_dns_queries(dns_watcher._batch)
+                dns_watcher._batch.clear()
+                await DatabaseManager.close()
+            except Exception as e:
+                logger.error(f"Failed to flush DNS queries: {e}")
         
 if __name__ == "__main__":
     asyncio.run(main())

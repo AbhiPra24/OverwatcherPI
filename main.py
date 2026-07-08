@@ -99,15 +99,7 @@ async def run_bot():
                 if task and not task.done():
                     task.cancel()
                     
-            # Flush DNS watcher buffers
-            dns_watcher = app.bot_data.get("dns_watcher")
-            if dns_watcher and hasattr(dns_watcher, "_batch") and dns_watcher._batch:
-                logger.info("Flushing DNS watcher buffers...")
-                try:
-                    await DatabaseManager.insert_dns_queries(dns_watcher._batch)
-                    dns_watcher._batch.clear()
-                except Exception as e:
-                    logger.error(f"Failed to flush DNS queries: {e}")
+
                     
     except Exception as e:
         logger.exception("Critical error in main loop")
