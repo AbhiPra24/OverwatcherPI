@@ -18,8 +18,10 @@ def setup_logging():
 
 async def _post_init(app: Application) -> None:
     """PTB post_init hook. Runs within the event loop before polling starts."""
+    logging.getLogger(__name__).info("ENTERING _post_init")
     # 1. Initialize SQLite connection and schemas
     await DatabaseManager.get_db()
+    logging.getLogger(__name__).info("Database tables initialized (from _post_init).")
     
     # 2. Ensure OUI database is cached
     await oui.load_or_refresh()
@@ -69,7 +71,10 @@ async def run_bot():
     logger = logging.getLogger(__name__)
     
     logger.info("Initializing OverwatcherPI Daemon...")
-    app = setup_application(post_init_hook=_post_init)
+    app = setup_application(post_init_hook=None)
+    
+    logger.info("Manually invoking _post_init...")
+    await _post_init(app)
     
     stop_event = asyncio.Event()
     

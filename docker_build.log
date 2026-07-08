@@ -1,0 +1,864 @@
+ Image overwatcherpi-sniffer Building 
+ Image overwatcherpi-dashboard Building 
+ Image overwatcherpi-bot Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.42kB done
+#1 DONE 0.0s
+
+#2 [bot internal] load build definition from Dockerfile
+#2 transferring dockerfile:
+#2 transferring dockerfile: 1.23kB done
+#2 DONE 1.9s
+
+#3 [bot] resolve image config for docker-image://docker.io/docker/dockerfile:1
+#3 ...
+
+#4 [dashboard internal] load build definition from Dockerfile
+#4 transferring dockerfile: 654B done
+#4 DONE 2.2s
+
+#3 [sniffer] resolve image config for docker-image://docker.io/docker/dockerfile:1
+#3 DONE 4.5s
+
+#5 [dashboard] docker-image://docker.io/docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
+#5 resolve docker.io/docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
+#5 resolve docker.io/docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89 0.4s done
+#5 resolve docker.io/docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89 0.4s done
+#5 DONE 1.5s
+
+#5 [bot] docker-image://docker.io/docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
+#5 sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 0B / 13.22MB 0.2s
+#5 sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 1.05MB / 13.22MB 0.6s
+#5 sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 3.15MB / 13.22MB 0.8s
+#5 sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 4.19MB / 13.22MB 0.9s
+#5 sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 6.29MB / 13.22MB 1.1s
+#5 sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 8.39MB / 13.22MB 1.2s
+#5 sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 9.44MB / 13.22MB 1.4s
+#5 sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 11.53MB / 13.22MB 1.5s
+#5 sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 13.22MB / 13.22MB 1.7s
+#5 sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 13.22MB / 13.22MB 2.3s done
+#5 sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 13.22MB / 13.22MB 2.3s done
+#5 extracting sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22
+#5 extracting sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 0.1s done
+#5 extracting sha256:4eb94397eda75ee431bc375a19a2168ef43d859cbfaaf63bb2d8a3dd783d2b22 0.1s done
+#5 DONE 4.3s
+
+#6 [sniffer internal] load metadata for docker.io/library/python:3.12-slim
+#6 DONE 1.7s
+
+#7 [bot internal] load .dockerignore
+#7 transferring context: 184B done
+#7 DONE 0.1s
+
+#8 [bot internal] load build context
+#8 ...
+
+#9 [bot stage-0 1/8] FROM docker.io/library/python:3.12-slim@sha256:423ed6ab25b1921a477529254bfeeabf5855151dc2c3141699a1bfc852199fbf
+#9 resolve docker.io/library/python:3.12-slim@sha256:423ed6ab25b1921a477529254bfeeabf5855151dc2c3141699a1bfc852199fbf 1.2s done
+#9 CACHED
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 ...
+
+#8 [sniffer internal] load build context
+#8 transferring context: 2.28MB 1.4s
+#8 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 6.524 Hit:1 http://deb.debian.org/debian trixie InRelease
+#10 6.524 Get:2 http://deb.debian.org/debian trixie-updates InRelease [47.3 kB]
+#10 6.528 Get:3 http://deb.debian.org/debian-security trixie-security InRelease [43.4 kB]
+#10 6.671 Get:4 http://deb.debian.org/debian trixie/main arm64 Packages [9608 kB]
+#10 ...
+
+#8 [sniffer internal] load build context
+#8 transferring context: 111.09MB 9.0s
+#8 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 14.53 Get:5 http://deb.debian.org/debian trixie-updates/main arm64 Packages [5404 B]
+#10 14.60 Get:6 http://deb.debian.org/debian-security trixie-security/main arm64 Packages [226 kB]
+#10 17.82 Fetched 9930 kB in 9s (1047 kB/s)
+#10 17.82 Reading package lists...
+#10 19.28 Reading package lists...
+#10 ...
+
+#8 [sniffer internal] load build context
+#8 transferring context: 172.90MB 19.3s
+#8 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 19.28 Reading package lists...
+#10 20.71 Building dependency tree...
+#10 21.16 Reading state information...
+#10 22.31 The following additional packages will be installed:
+#10 22.31   libbrotli1 libcom-err2 libcurl4t64 libgnutls30t64 libgssapi-krb5-2 libidn2-0
+#10 22.31   libk5crypto3 libkeyutils1 libkrb5-3 libkrb5support0 libldap2 libnghttp2-14
+#10 22.32   libnghttp3-9 libp11-kit0 libpsl5t64 librtmp1 libsasl2-2 libsasl2-modules-db
+#10 22.32   libssh2-1t64 libtasn1-6 libunistring5
+#10 22.32 Suggested packages:
+#10 22.32   gnutls-bin krb5-doc krb5-user
+#10 22.32 Recommended packages:
+#10 22.32   bash-completion krb5-locales libldap-common publicsuffix libsasl2-modules
+#10 23.52 The following NEW packages will be installed:
+#10 23.52   curl libbrotli1 libcom-err2 libcurl4t64 libgnutls30t64 libgssapi-krb5-2
+#10 23.52   libidn2-0 libk5crypto3 libkeyutils1 libkrb5-3 libkrb5support0 libldap2
+#10 23.52   libnghttp2-14 libnghttp3-9 libp11-kit0 libpsl5t64 librtmp1 libsasl2-2
+#10 23.52   libsasl2-modules-db libssh2-1t64 libtasn1-6 libunistring5
+#10 ...
+
+#8 [sniffer internal] load build context
+#8 transferring context: 229.16MB 27.7s
+#8 transferring context: 229.16MB 34.6s
+#8 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 36.82 0 upgraded, 22 newly installed, 0 to remove and 0 not upgraded.
+#10 36.82 Need to get 4648 kB of archives.
+#10 36.82 After this operation, 15.6 MB of additional disk space will be used.
+#10 36.82 Get:1 http://deb.debian.org/debian trixie/main arm64 libbrotli1 arm64 1.1.0-2+b7 [308 kB]
+#10 37.42 Get:2 http://deb.debian.org/debian-security trixie-security/main arm64 libkrb5support0 arm64 1.21.3-5+deb13u1 [32.5 kB]
+#10 37.46 Get:3 http://deb.debian.org/debian trixie/main arm64 libcom-err2 arm64 1.47.2-3+b11 [24.9 kB]
+#10 38.50 Get:4 http://deb.debian.org/debian-security trixie-security/main arm64 libk5crypto3 arm64 1.21.3-5+deb13u1 [81.4 kB]
+#10 41.74 Get:5 http://deb.debian.org/debian trixie/main arm64 libkeyutils1 arm64 1.6.3-6 [9716 B]
+#10 41.74 Get:6 http://deb.debian.org/debian-security trixie-security/main arm64 libkrb5-3 arm64 1.21.3-5+deb13u1 [308 kB]
+#10 41.74 Get:7 http://deb.debian.org/debian-security trixie-security/main arm64 libgssapi-krb5-2 arm64 1.21.3-5+deb13u1 [128 kB]
+#10 41.74 Get:8 http://deb.debian.org/debian trixie/main arm64 libunistring5 arm64 1.3-2 [453 kB]
+#10 41.82 Get:9 http://deb.debian.org/debian trixie/main arm64 libidn2-0 arm64 2.3.8-2 [107 kB]
+#10 41.82 Get:10 http://deb.debian.org/debian trixie/main arm64 libsasl2-modules-db arm64 2.1.28+dfsg1-9 [20.1 kB]
+#10 43.38 Get:11 http://deb.debian.org/debian trixie/main arm64 libsasl2-2 arm64 2.1.28+dfsg1-9 [55.6 kB]
+#10 43.40 Get:12 http://deb.debian.org/debian trixie/main arm64 libldap2 arm64 2.6.10+dfsg-1 [179 kB]
+#10 ...
+
+#8 [sniffer internal] load build context
+#8 transferring context: 229.63MB 42.3s
+#8 transferring context: 229.72MB 47.5s
+#8 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 48.16 Get:13 http://deb.debian.org/debian-security trixie-security/main arm64 libnghttp2-14 arm64 1.64.0-1.1+deb13u1 [71.6 kB]
+#10 48.16 Get:14 http://deb.debian.org/debian trixie/main arm64 libnghttp3-9 arm64 1.8.0-1 [63.2 kB]
+#10 48.46 Get:15 http://deb.debian.org/debian trixie/main arm64 libpsl5t64 arm64 0.21.2-1.1+b1 [57.1 kB]
+#10 49.79 Get:16 http://deb.debian.org/debian trixie/main arm64 libp11-kit0 arm64 0.25.5-3 [409 kB]
+#10 51.40 Get:17 http://deb.debian.org/debian trixie/main arm64 libtasn1-6 arm64 4.20.0-2 [47.3 kB]
+#10 51.40 Get:18 http://deb.debian.org/debian-security trixie-security/main arm64 libgnutls30t64 arm64 3.8.9-3+deb13u4 [1379 kB]
+#10 51.44 Get:19 http://deb.debian.org/debian trixie/main arm64 librtmp1 arm64 2.4+20151223.gitfa8646d.1-2+b5 [56.8 kB]
+#10 51.50 Get:20 http://deb.debian.org/debian-security trixie-security/main arm64 libssh2-1t64 arm64 1.11.1-1+deb13u1 [236 kB]
+#10 51.50 Get:21 http://deb.debian.org/debian trixie/main arm64 libcurl4t64 arm64 8.14.1-2+deb13u3 [359 kB]
+#10 51.89 Get:22 http://deb.debian.org/debian trixie/main arm64 curl arm64 8.14.1-2+deb13u3 [262 kB]
+#10 ...
+
+#8 [sniffer internal] load build context
+#8 transferring context: 229.98MB 58.1s
+#8 transferring context: 230.02MB 66.9s
+#8 transferring context: 230.89MB 76.1s
+#8 transferring context: 232.26MB 84.3s
+#8 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 89.91 debconf: unable to initialize frontend: Dialog
+#10 89.91 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#10 89.91 debconf: falling back to frontend: Readline
+#10 89.91 debconf: unable to initialize frontend: Readline
+#10 89.91 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC entries checked: /etc/perl /usr/local/lib/aarch64-linux-gnu/perl/5.40.1 /usr/local/share/perl/5.40.1 /usr/lib/aarch64-linux-gnu/perl5/5.40 /usr/share/perl5 /usr/lib/aarch64-linux-gnu/perl-base /usr/lib/aarch64-linux-gnu/perl/5.40 /usr/share/perl/5.40 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 8, <STDIN> line 22.)
+#10 89.91 debconf: falling back to frontend: Teletype
+#10 89.92 debconf: unable to initialize frontend: Teletype
+#10 89.92 debconf: (This frontend requires a controlling tty.)
+#10 89.92 debconf: falling back to frontend: Noninteractive
+#10 ...
+
+#8 [sniffer internal] load build context
+#8 transferring context: 237.82MB 96.1s
+#8 transferring context: 240.72MB 107.0s
+#8 transferring context: 240.75MB 114.0s
+#8 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 117.9 Fetched 4648 kB in 18s (261 kB/s)
+#10 ...
+
+#8 [sniffer internal] load build context
+#8 transferring context: 244.80MB 120.9s
+#8 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 125.1 Selecting previously unselected package libbrotli1:arm64.
+#10 125.1 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 5642 files and directories currently installed.)
+#10 125.1 Preparing to unpack .../00-libbrotli1_1.1.0-2+b7_arm64.deb ...
+#10 131.8 Unpacking libbrotli1:arm64 (1.1.0-2+b7) ...
+#10 ...
+
+#8 [sniffer internal] load build context
+#8 transferring context: 246.39MB 131.5s
+#8 transferring context: 247.38MB 137.8s
+#8 transferring context: 248.82MB 146.7s
+#8 transferring context: 251.37MB 151.7s
+#8 transferring context: 264.57MB 156.8s
+#8 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 157.6 Selecting previously unselected package libkrb5support0:arm64.
+#10 157.6 Preparing to unpack .../01-libkrb5support0_1.21.3-5+deb13u1_arm64.deb ...
+#10 157.8 Unpacking libkrb5support0:arm64 (1.21.3-5+deb13u1) ...
+#10 159.0 Selecting previously unselected package libcom-err2:arm64.
+#10 159.0 Preparing to unpack .../02-libcom-err2_1.47.2-3+b11_arm64.deb ...
+#10 159.2 Unpacking libcom-err2:arm64 (1.47.2-3+b11) ...
+#10 160.4 Selecting previously unselected package libk5crypto3:arm64.
+#10 160.4 Preparing to unpack .../03-libk5crypto3_1.21.3-5+deb13u1_arm64.deb ...
+#10 160.6 Unpacking libk5crypto3:arm64 (1.21.3-5+deb13u1) ...
+#10 161.4 Selecting previously unselected package libkeyutils1:arm64.
+#10 161.4 Preparing to unpack .../04-libkeyutils1_1.6.3-6_arm64.deb ...
+#10 161.5 Unpacking libkeyutils1:arm64 (1.6.3-6) ...
+#10 162.2 Selecting previously unselected package libkrb5-3:arm64.
+#10 162.2 Preparing to unpack .../05-libkrb5-3_1.21.3-5+deb13u1_arm64.deb ...
+#10 162.3 Unpacking libkrb5-3:arm64 (1.21.3-5+deb13u1) ...
+#10 ...
+
+#8 [sniffer internal] load build context
+#8 transferring context: 395.63MB 162.4s
+#8 transferring context: 445.02MB 167.5s
+#8 transferring context: 503.95MB 172.6s
+#8 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 163.4 Selecting previously unselected package libgssapi-krb5-2:arm64.
+#10 163.4 Preparing to unpack .../06-libgssapi-krb5-2_1.21.3-5+deb13u1_arm64.deb ...
+#10 163.5 Unpacking libgssapi-krb5-2:arm64 (1.21.3-5+deb13u1) ...
+#10 164.2 Selecting previously unselected package libunistring5:arm64.
+#10 164.2 Preparing to unpack .../07-libunistring5_1.3-2_arm64.deb ...
+#10 164.3 Unpacking libunistring5:arm64 (1.3-2) ...
+#10 165.0 Selecting previously unselected package libidn2-0:arm64.
+#10 165.0 Preparing to unpack .../08-libidn2-0_2.3.8-2_arm64.deb ...
+#10 165.1 Unpacking libidn2-0:arm64 (2.3.8-2) ...
+#10 165.7 Selecting previously unselected package libsasl2-modules-db:arm64.
+#10 165.7 Preparing to unpack .../09-libsasl2-modules-db_2.1.28+dfsg1-9_arm64.deb ...
+#10 165.8 Unpacking libsasl2-modules-db:arm64 (2.1.28+dfsg1-9) ...
+#10 166.5 Selecting previously unselected package libsasl2-2:arm64.
+#10 166.5 Preparing to unpack .../10-libsasl2-2_2.1.28+dfsg1-9_arm64.deb ...
+#10 166.6 Unpacking libsasl2-2:arm64 (2.1.28+dfsg1-9) ...
+#10 167.3 Selecting previously unselected package libldap2:arm64.
+#10 167.3 Preparing to unpack .../11-libldap2_2.6.10+dfsg-1_arm64.deb ...
+#10 167.4 Unpacking libldap2:arm64 (2.6.10+dfsg-1) ...
+#10 168.1 Selecting previously unselected package libnghttp2-14:arm64.
+#10 168.1 Preparing to unpack .../12-libnghttp2-14_1.64.0-1.1+deb13u1_arm64.deb ...
+#10 168.2 Unpacking libnghttp2-14:arm64 (1.64.0-1.1+deb13u1) ...
+#10 168.9 Selecting previously unselected package libnghttp3-9:arm64.
+#10 168.9 Preparing to unpack .../13-libnghttp3-9_1.8.0-1_arm64.deb ...
+#10 169.0 Unpacking libnghttp3-9:arm64 (1.8.0-1) ...
+#10 169.8 Selecting previously unselected package libpsl5t64:arm64.
+#10 169.8 Preparing to unpack .../14-libpsl5t64_0.21.2-1.1+b1_arm64.deb ...
+#10 169.9 Unpacking libpsl5t64:arm64 (0.21.2-1.1+b1) ...
+#10 170.6 Selecting previously unselected package libp11-kit0:arm64.
+#10 170.6 Preparing to unpack .../15-libp11-kit0_0.25.5-3_arm64.deb ...
+#10 170.7 Unpacking libp11-kit0:arm64 (0.25.5-3) ...
+#10 171.3 Selecting previously unselected package libtasn1-6:arm64.
+#10 171.3 Preparing to unpack .../16-libtasn1-6_4.20.0-2_arm64.deb ...
+#10 171.4 Unpacking libtasn1-6:arm64 (4.20.0-2) ...
+#10 172.0 Selecting previously unselected package libgnutls30t64:arm64.
+#10 172.0 Preparing to unpack .../17-libgnutls30t64_3.8.9-3+deb13u4_arm64.deb ...
+#10 172.1 Unpacking libgnutls30t64:arm64 (3.8.9-3+deb13u4) ...
+#10 173.0 Selecting previously unselected package librtmp1:arm64.
+#10 173.0 Preparing to unpack .../18-librtmp1_2.4+20151223.gitfa8646d.1-2+b5_arm64.deb ...
+#10 173.2 Unpacking librtmp1:arm64 (2.4+20151223.gitfa8646d.1-2+b5) ...
+#10 ...
+
+#8 [sniffer internal] load build context
+#8 transferring context: 515.72MB 173.6s done
+#8 DONE 178.3s
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 173.9 Selecting previously unselected package libssh2-1t64:arm64.
+#10 173.9 Preparing to unpack .../19-libssh2-1t64_1.11.1-1+deb13u1_arm64.deb ...
+#10 174.0 Unpacking libssh2-1t64:arm64 (1.11.1-1+deb13u1) ...
+#10 177.1 Selecting previously unselected package libcurl4t64:arm64.
+#10 177.1 Preparing to unpack .../20-libcurl4t64_8.14.1-2+deb13u3_arm64.deb ...
+#10 ...
+
+#11 [sniffer stage-0 2/8] RUN apt-get update && apt-get install -y --no-install-recommends     nmap     iproute2     bluez     curl     libcap2-bin     && rm -rf /var/lib/apt/lists/*
+#11 CACHED
+
+#12 [sniffer stage-0 3/8] RUN setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip $(which nmap)
+#12 CACHED
+
+#13 [sniffer stage-0 4/8] RUN groupadd -g 1000 overwatcher &&     useradd -u 1000 -g overwatcher -G bluetooth,video,adm -s /bin/bash -m overwatcher
+#13 CACHED
+
+#14 [sniffer stage-0 5/8] WORKDIR /app
+#14 CACHED
+
+#15 [sniffer stage-0 6/8] COPY requirements.txt .
+#15 CACHED
+
+#11 [bot stage-0 2/8] RUN apt-get update && apt-get install -y --no-install-recommends     nmap     iproute2     bluez     curl     libcap2-bin     && rm -rf /var/lib/apt/lists/*
+#11 CACHED
+
+#12 [bot stage-0 3/8] RUN setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip $(which nmap)
+#12 CACHED
+
+#13 [bot stage-0 4/8] RUN groupadd -g 1000 overwatcher &&     useradd -u 1000 -g overwatcher -G bluetooth,video,adm -s /bin/bash -m overwatcher
+#13 CACHED
+
+#14 [bot stage-0 5/8] WORKDIR /app
+#14 CACHED
+
+#15 [bot stage-0 6/8] COPY requirements.txt .
+#15 CACHED
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 177.3 Unpacking libcurl4t64:arm64 (8.14.1-2+deb13u3) ...
+#10 178.4 Selecting previously unselected package curl.
+#10 178.4 Preparing to unpack .../21-curl_8.14.1-2+deb13u3_arm64.deb ...
+#10 201.7 Unpacking curl (8.14.1-2+deb13u3) ...
+#10 258.0 Setting up libkeyutils1:arm64 (1.6.3-6) ...
+#10 275.6 Setting up libbrotli1:arm64 (1.1.0-2+b7) ...
+#10 311.9 Setting up libnghttp2-14:arm64 (1.64.0-1.1+deb13u1) ...
+#10 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 134.6 Collecting python-telegram-bot==22.8 (from -r requirements.txt (line 1))
+#16 134.7   Downloading python_telegram_bot-22.8-py3-none-any.whl.metadata (17 kB)
+#16 135.2 Collecting bleak==3.0.2 (from -r requirements.txt (line 2))
+#16 135.3   Downloading bleak-3.0.2-py3-none-any.whl.metadata (4.7 kB)
+#16 135.8 Collecting pydantic-settings==2.14.2 (from -r requirements.txt (line 3))
+#16 135.8   Downloading pydantic_settings-2.14.2-py3-none-any.whl.metadata (3.4 kB)
+#16 136.7 Collecting sherlock-project==0.16.0 (from -r requirements.txt (line 4))
+#16 136.8   Downloading sherlock_project-0.16.0-py3-none-any.whl.metadata (3.0 kB)
+#16 137.4 Collecting pydantic==2.13.4 (from -r requirements.txt (line 5))
+#16 137.4   Downloading pydantic-2.13.4-py3-none-any.whl.metadata (109 kB)
+#16 138.1 Collecting aiosqlite==0.22.1 (from -r requirements.txt (line 6))
+#16 138.1   Downloading aiosqlite-0.22.1-py3-none-any.whl.metadata (4.3 kB)
+#16 140.0 Collecting aiohttp==3.14.1 (from -r requirements.txt (line 7))
+#16 140.0   Downloading aiohttp-3.14.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (8.3 kB)
+#16 140.5 Collecting apscheduler==3.11.3 (from -r requirements.txt (line 8))
+#16 140.6   Downloading apscheduler-3.11.3-py3-none-any.whl.metadata (6.5 kB)
+#16 141.1 Collecting psutil==7.2.2 (from -r requirements.txt (line 9))
+#16 141.2   Downloading psutil-7.2.2-cp36-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (22 kB)
+#16 141.6 Collecting scapy==2.7.0 (from -r requirements.txt (line 10))
+#16 141.6   Downloading scapy-2.7.0-py3-none-any.whl.metadata (5.8 kB)
+#16 143.0 Collecting zeroconf==0.150.0 (from -r requirements.txt (line 11))
+#16 143.0   Downloading zeroconf-0.150.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (6.6 kB)
+#16 ...
+
+#10 [dashboard stage-0 2/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
+#10 312.1 Setting up libcom-err2:arm64 (1.47.2-3+b11) ...
+#10 312.5 Setting up libkrb5support0:arm64 (1.21.3-5+deb13u1) ...
+#10 312.9 Setting up libsasl2-modules-db:arm64 (2.1.28+dfsg1-9) ...
+#10 313.3 Setting up libp11-kit0:arm64 (0.25.5-3) ...
+#10 313.6 Setting up libunistring5:arm64 (1.3-2) ...
+#10 313.9 Setting up libk5crypto3:arm64 (1.21.3-5+deb13u1) ...
+#10 314.3 Setting up libsasl2-2:arm64 (2.1.28+dfsg1-9) ...
+#10 314.6 Setting up libnghttp3-9:arm64 (1.8.0-1) ...
+#10 314.9 Setting up libtasn1-6:arm64 (4.20.0-2) ...
+#10 315.4 Setting up libkrb5-3:arm64 (1.21.3-5+deb13u1) ...
+#10 315.8 Setting up libssh2-1t64:arm64 (1.11.1-1+deb13u1) ...
+#10 316.8 Setting up libldap2:arm64 (2.6.10+dfsg-1) ...
+#10 317.1 Setting up libidn2-0:arm64 (2.3.8-2) ...
+#10 317.4 Setting up libgssapi-krb5-2:arm64 (1.21.3-5+deb13u1) ...
+#10 317.8 Setting up libgnutls30t64:arm64 (3.8.9-3+deb13u4) ...
+#10 318.2 Setting up libpsl5t64:arm64 (0.21.2-1.1+b1) ...
+#10 318.5 Setting up librtmp1:arm64 (2.4+20151223.gitfa8646d.1-2+b5) ...
+#10 318.9 Setting up libcurl4t64:arm64 (8.14.1-2+deb13u3) ...
+#10 319.3 Setting up curl (8.14.1-2+deb13u3) ...
+#10 319.5 Processing triggers for libc-bin (2.41-12+deb13u3) ...
+#10 DONE 326.2s
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 ...
+
+#17 [dashboard stage-0 3/6] WORKDIR /app
+#17 DONE 5.8s
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 149.2 Collecting fastapi==0.139.0 (from -r requirements.txt (line 12))
+#16 149.3   Downloading fastapi-0.139.0-py3-none-any.whl.metadata (26 kB)
+#16 150.0 Collecting uvicorn==0.50.2 (from -r requirements.txt (line 13))
+#16 150.1   Downloading uvicorn-0.50.2-py3-none-any.whl.metadata (6.7 kB)
+#16 152.2 Collecting speedtest-cli==2.1.3 (from -r requirements.txt (line 14))
+#16 152.2   Downloading speedtest_cli-2.1.3-py2.py3-none-any.whl.metadata (6.8 kB)
+#16 155.0 Collecting httpx<0.29,>=0.27 (from python-telegram-bot==22.8->-r requirements.txt (line 1))
+#16 155.0   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+#16 156.2 Collecting dbus-fast>=1.83.0 (from bleak==3.0.2->-r requirements.txt (line 2))
+#16 156.2   Downloading dbus_fast-5.0.22-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (11 kB)
+#16 ...
+
+#18 [dashboard stage-0 4/6] COPY dashboard/requirements-dashboard.txt .
+#18 DONE 3.2s
+
+#19 [dashboard stage-0 5/6] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements-dashboard.txt
+#19 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 158.3 Collecting python-dotenv>=0.21.0 (from pydantic-settings==2.14.2->-r requirements.txt (line 3))
+#16 158.4   Downloading python_dotenv-1.2.2-py3-none-any.whl.metadata (27 kB)
+#16 159.0 Collecting typing-inspection>=0.4.0 (from pydantic-settings==2.14.2->-r requirements.txt (line 3))
+#16 159.1   Downloading typing_inspection-0.4.2-py3-none-any.whl.metadata (2.6 kB)
+#16 159.5 Collecting PySocks<2.0.0,>=1.7.0 (from sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 159.6   Downloading PySocks-1.7.1-py3-none-any.whl.metadata (13 kB)
+#16 160.1 Collecting certifi>=2019.6.16 (from sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 160.1   Downloading certifi-2026.6.17-py3-none-any.whl.metadata (2.5 kB)
+#16 160.6 Collecting colorama<0.5.0,>=0.4.1 (from sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 160.6   Downloading colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+#16 160.8 Collecting openpyxl<4.0.0,>=3.0.10 (from sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 160.9   Downloading openpyxl-3.1.5-py2.py3-none-any.whl.metadata (2.5 kB)
+#16 161.3 Collecting pandas<3.0.0,>=2.2.1 (from sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 161.3   Downloading pandas-2.3.3-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl.metadata (91 kB)
+#16 164.6 Collecting requests<3.0.0,>=2.22.0 (from sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 164.6   Downloading requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+#16 164.9 Collecting requests-futures<2.0.0,>=1.0.0 (from sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 164.9   Downloading requests_futures-1.0.2-py2.py3-none-any.whl.metadata (12 kB)
+#16 165.5 Collecting stem<2.0.0,>=1.8.0 (from sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 165.5   Downloading stem-1.8.2.tar.gz (2.9 MB)
+#16 ...
+
+#19 [dashboard stage-0 5/6] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements-dashboard.txt
+#19 7.602 Collecting streamlit>=1.37 (from -r requirements-dashboard.txt (line 1))
+#19 7.772   Downloading streamlit-1.59.0-py3-none-any.whl.metadata (9.6 kB)
+#19 8.068 Collecting pandas (from -r requirements-dashboard.txt (line 2))
+#19 8.102   Downloading pandas-3.0.3-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl.metadata (79 kB)
+#19 8.544 Collecting psutil (from -r requirements-dashboard.txt (line 3))
+#19 8.546   Using cached psutil-7.2.2-cp36-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (22 kB)
+#19 8.814 Collecting pydantic (from -r requirements-dashboard.txt (line 4))
+#19 8.816   Using cached pydantic-2.13.4-py3-none-any.whl.metadata (109 kB)
+#19 8.938 Collecting pydantic-settings (from -r requirements-dashboard.txt (line 5))
+#19 8.940   Using cached pydantic_settings-2.14.2-py3-none-any.whl.metadata (3.4 kB)
+#19 9.074 Collecting altair!=5.4.0,!=5.4.1,<7,>=4.0 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 9.109   Downloading altair-6.2.2-py3-none-any.whl.metadata (11 kB)
+#19 9.373 Collecting blinker<2,>=1.5.0 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 9.423   Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+#19 9.634 Collecting cachetools<8,>=5.5 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 9.668   Downloading cachetools-7.1.4-py3-none-any.whl.metadata (5.5 kB)
+#19 9.928 Collecting click<9,>=7.0 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 9.963   Downloading click-8.4.2-py3-none-any.whl.metadata (2.6 kB)
+#19 10.37 Collecting gitpython!=3.1.19,<4,>=3.0.7 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 10.42   Downloading gitpython-3.1.50-py3-none-any.whl.metadata (14 kB)
+#19 12.48 Collecting numpy<3,>=1.23 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 12.51   Downloading numpy-2.5.1-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl.metadata (6.6 kB)
+#19 12.78 Collecting packaging>=20 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 12.81   Downloading packaging-26.2-py3-none-any.whl.metadata (3.5 kB)
+#19 14.49 Collecting pillow<13,>=7.1.0 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 14.52   Downloading pillow-12.3.0-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl.metadata (9.1 kB)
+#19 14.86 Collecting pydeck<1,>=0.8.0b4 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 14.90   Downloading pydeck-0.9.3-py2.py3-none-any.whl.metadata (4.2 kB)
+#19 16.57 Collecting protobuf<8,>=3.20 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 16.60   Downloading protobuf-7.35.1-cp310-abi3-manylinux2014_aarch64.whl.metadata (595 bytes)
+#19 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 166.3      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.9/2.9 MB 3.6 MB/s eta 0:00:00
+#16 166.6   Installing build dependencies: started
+#16 170.5   Installing build dependencies: finished with status 'done'
+#16 170.5   Getting requirements to build wheel: started
+#16 171.0   Getting requirements to build wheel: finished with status 'done'
+#16 171.0   Preparing metadata (pyproject.toml): started
+#16 172.4   Preparing metadata (pyproject.toml): finished with status 'done'
+#16 172.6 Collecting annotated-types>=0.6.0 (from pydantic==2.13.4->-r requirements.txt (line 5))
+#16 172.6   Downloading annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+#16 173.9 Collecting pydantic-core==2.46.4 (from pydantic==2.13.4->-r requirements.txt (line 5))
+#16 174.0   Downloading pydantic_core-2.46.4-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (6.6 kB)
+#16 176.0 Collecting typing-extensions>=4.14.1 (from pydantic==2.13.4->-r requirements.txt (line 5))
+#16 176.1   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+#16 177.7 Collecting aiohappyeyeballs>=2.5.0 (from aiohttp==3.14.1->-r requirements.txt (line 7))
+#16 177.7   Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl.metadata (5.9 kB)
+#16 ...
+
+#19 [dashboard stage-0 5/6] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements-dashboard.txt
+#19 19.68 Collecting pyarrow>=7.0 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 19.71   Downloading pyarrow-24.0.0-cp312-cp312-manylinux_2_28_aarch64.whl.metadata (3.0 kB)
+#19 20.03 Collecting requests<3,>=2.27 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 20.03   Using cached requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+#19 20.28 Collecting tenacity<10,>=8.1.0 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 20.31   Downloading tenacity-9.1.4-py3-none-any.whl.metadata (1.2 kB)
+#19 20.75 Collecting toml<2,>=0.10.1 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 20.78   Downloading toml-0.10.2-py2.py3-none-any.whl.metadata (7.1 kB)
+#19 21.54 Collecting typing-extensions<5,>=4.10.0 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 21.54   Using cached typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+#19 21.69 Collecting starlette>=0.40.0 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 21.73   Downloading starlette-1.3.1-py3-none-any.whl.metadata (6.4 kB)
+#19 21.97 Collecting uvicorn>=0.30.0 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 21.97   Using cached uvicorn-0.50.2-py3-none-any.whl.metadata (6.7 kB)
+#19 22.18 Collecting httptools>=0.6.3 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 22.23   Downloading httptools-0.8.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (3.5 kB)
+#19 23.47 Collecting anyio>=4.0.0 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 23.50   Downloading anyio-4.14.1-py3-none-any.whl.metadata (4.6 kB)
+#19 25.04 Collecting python-multipart>=0.0.10 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 25.08   Downloading python_multipart-0.0.32-py3-none-any.whl.metadata (2.1 kB)
+#19 26.79 Collecting websockets>=12.0.0 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 26.81   Downloading websockets-16.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (6.8 kB)
+#19 27.17 Collecting itsdangerous>=2.1.2 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 27.21   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+#19 27.45 Collecting watchdog<7,>=2.1.5 (from streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 27.49   Downloading watchdog-6.0.0-py3-none-manylinux2014_aarch64.whl.metadata (44 kB)
+#19 27.90 Collecting python-dateutil>=2.8.2 (from pandas->-r requirements-dashboard.txt (line 2))
+#19 27.93   Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+#19 28.18 Collecting annotated-types>=0.6.0 (from pydantic->-r requirements-dashboard.txt (line 4))
+#19 28.18   Using cached annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+#19 29.45 Collecting pydantic-core==2.46.4 (from pydantic->-r requirements-dashboard.txt (line 4))
+#19 29.45   Using cached pydantic_core-2.46.4-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (6.6 kB)
+#19 29.58 Collecting typing-inspection>=0.4.2 (from pydantic->-r requirements-dashboard.txt (line 4))
+#19 29.58   Using cached typing_inspection-0.4.2-py3-none-any.whl.metadata (2.6 kB)
+#19 29.70 Collecting python-dotenv>=0.21.0 (from pydantic-settings->-r requirements-dashboard.txt (line 5))
+#19 29.70   Using cached python_dotenv-1.2.2-py3-none-any.whl.metadata (27 kB)
+#19 29.88 Collecting jinja2 (from altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 29.92   Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+#19 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 178.1 Collecting aiosignal>=1.4.0 (from aiohttp==3.14.1->-r requirements.txt (line 7))
+#16 178.1   Downloading aiosignal-1.4.0-py3-none-any.whl.metadata (3.7 kB)
+#16 178.6 Collecting attrs>=17.3.0 (from aiohttp==3.14.1->-r requirements.txt (line 7))
+#16 178.6   Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+#16 179.5 Collecting frozenlist>=1.1.1 (from aiohttp==3.14.1->-r requirements.txt (line 7))
+#16 179.6   Downloading frozenlist-1.8.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (20 kB)
+#16 180.1 Collecting multidict<7.0,>=4.5 (from aiohttp==3.14.1->-r requirements.txt (line 7))
+#16 180.1   Downloading multidict-6.7.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (5.3 kB)
+#16 181.4 Collecting propcache>=0.2.0 (from aiohttp==3.14.1->-r requirements.txt (line 7))
+#16 181.4   Downloading propcache-0.5.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (16 kB)
+#16 183.4 Collecting yarl<2.0,>=1.17.0 (from aiohttp==3.14.1->-r requirements.txt (line 7))
+#16 183.4   Downloading yarl-1.24.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (94 kB)
+#16 185.0 Collecting tzlocal>=3.0 (from apscheduler==3.11.3->-r requirements.txt (line 8))
+#16 185.0   Downloading tzlocal-5.4.4-py3-none-any.whl.metadata (7.7 kB)
+#16 185.7 Collecting ifaddr>=0.1.7 (from zeroconf==0.150.0->-r requirements.txt (line 11))
+#16 185.8   Downloading ifaddr-0.2.0-py3-none-any.whl.metadata (4.9 kB)
+#16 186.0 Collecting starlette>=0.46.0 (from fastapi==0.139.0->-r requirements.txt (line 12))
+#16 186.0   Using cached starlette-1.3.1-py3-none-any.whl.metadata (6.4 kB)
+#16 186.3 Collecting annotated-doc>=0.0.2 (from fastapi==0.139.0->-r requirements.txt (line 12))
+#16 186.3   Downloading annotated_doc-0.0.4-py3-none-any.whl.metadata (6.6 kB)
+#16 186.9 Collecting click>=7.0 (from uvicorn==0.50.2->-r requirements.txt (line 13))
+#16 186.9   Using cached click-8.4.2-py3-none-any.whl.metadata (2.6 kB)
+#16 187.0 Collecting h11>=0.8 (from uvicorn==0.50.2->-r requirements.txt (line 13))
+#16 187.1   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+#16 187.3 Collecting anyio (from httpx<0.29,>=0.27->python-telegram-bot==22.8->-r requirements.txt (line 1))
+#16 187.3   Using cached anyio-4.14.1-py3-none-any.whl.metadata (4.6 kB)
+#16 187.4 Collecting httpcore==1.* (from httpx<0.29,>=0.27->python-telegram-bot==22.8->-r requirements.txt (line 1))
+#16 187.4   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+#16 187.7 Collecting idna (from httpx<0.29,>=0.27->python-telegram-bot==22.8->-r requirements.txt (line 1))
+#16 187.7   Downloading idna-3.18-py3-none-any.whl.metadata (6.1 kB)
+#16 188.1 Collecting et-xmlfile (from openpyxl<4.0.0,>=3.0.10->sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 188.1   Downloading et_xmlfile-2.0.0-py3-none-any.whl.metadata (2.7 kB)
+#16 ...
+
+#19 [dashboard stage-0 5/6] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements-dashboard.txt
+#19 30.26 Collecting jsonschema>=3.0 (from altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 30.30   Downloading jsonschema-4.26.0-py3-none-any.whl.metadata (7.6 kB)
+#19 30.55 Collecting narwhals>=2.4.0 (from altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 30.59   Downloading narwhals-2.23.0-py3-none-any.whl.metadata (15 kB)
+#19 34.25 Collecting idna>=2.8 (from anyio>=4.0.0->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 34.25   Using cached idna-3.18-py3-none-any.whl.metadata (6.1 kB)
+#19 34.48 Collecting gitdb<5,>=4.0.1 (from gitpython!=3.1.19,<4,>=3.0.7->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 34.52   Downloading gitdb-4.0.12-py3-none-any.whl.metadata (1.2 kB)
+#19 34.89 Collecting six>=1.5 (from python-dateutil>=2.8.2->pandas->-r requirements-dashboard.txt (line 2))
+#19 34.93   Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+#19 35.25 Collecting charset_normalizer<4,>=2 (from requests<3,>=2.27->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 35.25   Using cached charset_normalizer-3.4.9-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (41 kB)
+#19 36.21 Collecting urllib3<3,>=1.26 (from requests<3,>=2.27->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 36.24   Downloading urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+#19 36.57 Collecting certifi>=2023.5.7 (from requests<3,>=2.27->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 36.57   Using cached certifi-2026.6.17-py3-none-any.whl.metadata (2.5 kB)
+#19 36.71 Collecting h11>=0.8 (from uvicorn>=0.30.0->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 36.71   Using cached h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+#19 36.86 Collecting smmap<6,>=3.0.1 (from gitdb<5,>=4.0.1->gitpython!=3.1.19,<4,>=3.0.7->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 36.89   Downloading smmap-5.0.3-py3-none-any.whl.metadata (4.6 kB)
+#19 37.27 Collecting MarkupSafe>=2.0 (from jinja2->altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 37.31   Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (2.7 kB)
+#19 37.54 Collecting attrs>=22.2.0 (from jsonschema>=3.0->altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 37.55   Using cached attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+#19 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 188.6 Collecting numpy>=1.26.0 (from pandas<3.0.0,>=2.2.1->sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 188.6   Using cached numpy-2.5.1-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl.metadata (6.6 kB)
+#16 188.7 Collecting python-dateutil>=2.8.2 (from pandas<3.0.0,>=2.2.1->sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 188.7   Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+#16 190.7 Collecting pytz>=2020.1 (from pandas<3.0.0,>=2.2.1->sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 190.7   Downloading pytz-2026.2-py2.py3-none-any.whl.metadata (22 kB)
+#16 192.6 Collecting tzdata>=2022.7 (from pandas<3.0.0,>=2.2.1->sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 192.6   Downloading tzdata-2026.2-py2.py3-none-any.whl.metadata (1.4 kB)
+#16 193.1 Collecting charset_normalizer<4,>=2 (from requests<3.0.0,>=2.22.0->sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 193.1   Downloading charset_normalizer-3.4.9-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (41 kB)
+#16 194.2 Collecting urllib3<3,>=1.26 (from requests<3.0.0,>=2.22.0->sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 194.3   Downloading urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+#16 194.8 Collecting six>=1.5 (from python-dateutil>=2.8.2->pandas<3.0.0,>=2.2.1->sherlock-project==0.16.0->-r requirements.txt (line 4))
+#16 194.8   Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+#16 194.8 Downloading python_telegram_bot-22.8-py3-none-any.whl (769 kB)
+#16 195.1    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 769.4/769.4 kB 2.4 MB/s eta 0:00:00
+#16 195.1 Downloading bleak-3.0.2-py3-none-any.whl (146 kB)
+#16 195.3 Downloading pydantic_settings-2.14.2-py3-none-any.whl (61 kB)
+#16 195.4 Downloading sherlock_project-0.16.0-py3-none-any.whl (36 kB)
+#16 195.6 Downloading pydantic-2.13.4-py3-none-any.whl (472 kB)
+#16 211.6 Downloading aiosqlite-0.22.1-py3-none-any.whl (17 kB)
+#16 ...
+
+#19 [dashboard stage-0 5/6] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements-dashboard.txt
+#19 55.02 Collecting jsonschema-specifications>=2023.03.6 (from jsonschema>=3.0->altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 55.07   Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl.metadata (2.9 kB)
+#19 61.88 Collecting referencing>=0.28.4 (from jsonschema>=3.0->altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 61.91   Downloading referencing-0.37.0-py3-none-any.whl.metadata (2.8 kB)
+#19 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 216.6 Downloading aiohttp-3.14.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (1.8 MB)
+#16 220.1    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.8/1.8 MB 441.6 kB/s eta 0:00:00
+#16 220.1 Downloading apscheduler-3.11.3-py3-none-any.whl (66 kB)
+#16 220.2 Downloading psutil-7.2.2-cp36-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (156 kB)
+#16 221.7 Downloading scapy-2.7.0-py3-none-any.whl (2.6 MB)
+#16 ...
+
+#19 [dashboard stage-0 5/6] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements-dashboard.txt
+#19 63.93 Collecting rpds-py>=0.25.0 (from jsonschema>=3.0->altair!=5.4.0,!=5.4.1,<7,>=4.0->streamlit>=1.37->-r requirements-dashboard.txt (line 1))
+#19 63.97   Downloading rpds_py-2026.6.3-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (4.1 kB)
+#19 65.57 Downloading streamlit-1.59.0-py3-none-any.whl (10.3 MB)
+#19 70.68    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.3/10.3 MB 2.0 MB/s eta 0:00:00
+#19 70.73 Downloading pandas-3.0.3-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl (10.4 MB)
+#19 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 223.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.6/2.6 MB 1.3 MB/s eta 0:00:00
+#16 223.5 Downloading zeroconf-0.150.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (2.1 MB)
+#16 225.0    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 1.3 MB/s eta 0:00:00
+#16 225.0 Downloading fastapi-0.139.0-py3-none-any.whl (130 kB)
+#16 227.1 Downloading uvicorn-0.50.2-py3-none-any.whl (72 kB)
+#16 228.8 Downloading speedtest_cli-2.1.3-py2.py3-none-any.whl (23 kB)
+#16 229.0 Downloading pydantic_core-2.46.4-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (2.0 MB)
+#16 230.8    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.0/2.0 MB 981.6 kB/s eta 0:00:00
+#16 230.8 Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl (15 kB)
+#16 ...
+
+#19 [dashboard stage-0 5/6] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements-dashboard.txt
+#19 76.05    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.4/10.4 MB 1.9 MB/s eta 0:00:00
+#19 76.05 Using cached psutil-7.2.2-cp36-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (156 kB)
+#19 76.06 Using cached pydantic-2.13.4-py3-none-any.whl (472 kB)
+#19 76.06 Using cached pydantic_core-2.46.4-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (2.0 MB)
+#19 76.06 Using cached pydantic_settings-2.14.2-py3-none-any.whl (61 kB)
+#19 76.09 Downloading altair-6.2.2-py3-none-any.whl (797 kB)
+#19 76.34    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 797.6/797.6 kB 2.5 MB/s eta 0:00:00
+#19 76.38 Downloading annotated_types-0.7.0-py3-none-any.whl (13 kB)
+#19 76.57 Downloading anyio-4.14.1-py3-none-any.whl (124 kB)
+#19 76.74 Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+#19 76.93 Downloading cachetools-7.1.4-py3-none-any.whl (16 kB)
+#19 77.09 Downloading click-8.4.2-py3-none-any.whl (119 kB)
+#19 77.27 Downloading gitpython-3.1.50-py3-none-any.whl (212 kB)
+#19 77.39 Downloading httptools-0.8.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (518 kB)
+#19 77.57 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+#19 78.09 Downloading numpy-2.5.1-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (15.2 MB)
+#19 83.88    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 15.2/15.2 MB 2.6 MB/s eta 0:00:00
+#19 83.93 Downloading packaging-26.2-py3-none-any.whl (100 kB)
+#19 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 234.2 Downloading aiosignal-1.4.0-py3-none-any.whl (7.5 kB)
+#16 234.3 Downloading annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+#16 234.5 Downloading annotated_types-0.7.0-py3-none-any.whl (13 kB)
+#16 234.7 Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+#16 234.8 Downloading certifi-2026.6.17-py3-none-any.whl (133 kB)
+#16 235.0 Downloading click-8.4.2-py3-none-any.whl (119 kB)
+#16 235.2 Downloading colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+#16 235.4 Downloading dbus_fast-5.0.22-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (799 kB)
+#16 235.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 799.5/799.5 kB 4.0 MB/s eta 0:00:00
+#16 235.5 Downloading frozenlist-1.8.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (243 kB)
+#16 236.1 Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+#16 236.3 Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+#16 236.5 Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+#16 236.7 Downloading ifaddr-0.2.0-py3-none-any.whl (12 kB)
+#16 237.0 Downloading multidict-6.7.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (258 kB)
+#16 237.4 Downloading openpyxl-3.1.5-py2.py3-none-any.whl (250 kB)
+#16 240.1 Downloading pandas-2.3.3-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl (11.7 MB)
+#16 248.1    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.7/11.7 MB 1.4 MB/s eta 0:00:00
+#16 248.2 Downloading propcache-0.5.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (59 kB)
+#16 ...
+
+#19 [dashboard stage-0 5/6] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements-dashboard.txt
+#19 90.14 Downloading pillow-12.3.0-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (6.3 MB)
+#19 92.14    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 3.0 MB/s eta 0:00:00
+#19 92.19 Downloading protobuf-7.35.1-cp310-abi3-manylinux2014_aarch64.whl (328 kB)
+#19 92.44 Downloading pyarrow-24.0.0-cp312-cp312-manylinux_2_28_aarch64.whl (45.7 MB)
+#19 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 248.4 Downloading PySocks-1.7.1-py3-none-any.whl (16 kB)
+#16 248.7 Downloading python_dotenv-1.2.2-py3-none-any.whl (22 kB)
+#16 248.8 Downloading requests-2.34.2-py3-none-any.whl (73 kB)
+#16 250.3 Downloading requests_futures-1.0.2-py2.py3-none-any.whl (7.7 kB)
+#16 250.5 Downloading starlette-1.3.1-py3-none-any.whl (73 kB)
+#16 250.8 Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+#16 251.0 Downloading typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+#16 251.4 Downloading tzlocal-5.4.4-py3-none-any.whl (18 kB)
+#16 252.7 Downloading yarl-1.24.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (102 kB)
+#16 254.2 Using cached anyio-4.14.1-py3-none-any.whl (124 kB)
+#16 254.5 Downloading charset_normalizer-3.4.9-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (215 kB)
+#16 254.7 Downloading idna-3.18-py3-none-any.whl (65 kB)
+#16 290.3 Using cached numpy-2.5.1-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (15.2 MB)
+#16 290.4 Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+#16 ...
+
+#19 [dashboard stage-0 5/6] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements-dashboard.txt
+#19 162.6    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.7/45.7 MB ? eta 0:00:00
+#19 162.7 Downloading pydeck-0.9.3-py2.py3-none-any.whl (11.4 MB)
+#19 166.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.4/11.4 MB 2.9 MB/s eta 0:00:00
+#19 166.5 Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+#19 166.5 Using cached python_dotenv-1.2.2-py3-none-any.whl (22 kB)
+#19 166.6 Downloading python_multipart-0.0.32-py3-none-any.whl (30 kB)
+#19 166.8 Using cached requests-2.34.2-py3-none-any.whl (73 kB)
+#19 166.8 Using cached starlette-1.3.1-py3-none-any.whl (73 kB)
+#19 166.8 Downloading tenacity-9.1.4-py3-none-any.whl (28 kB)
+#19 167.0 Downloading toml-0.10.2-py2.py3-none-any.whl (16 kB)
+#19 167.1 Using cached typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+#19 167.1 Using cached typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+#19 167.1 Using cached uvicorn-0.50.2-py3-none-any.whl (72 kB)
+#19 167.1 Downloading watchdog-6.0.0-py3-none-manylinux2014_aarch64.whl (79 kB)
+#19 167.3 Downloading websockets-16.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (186 kB)
+#19 168.3 Using cached certifi-2026.6.17-py3-none-any.whl (133 kB)
+#19 168.3 Using cached charset_normalizer-3.4.9-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (215 kB)
+#19 168.4 Downloading gitdb-4.0.12-py3-none-any.whl (62 kB)
+#19 168.4 Using cached h11-0.16.0-py3-none-any.whl (37 kB)
+#19 168.5 Using cached idna-3.18-py3-none-any.whl (65 kB)
+#19 168.5 Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+#19 168.6 Downloading jsonschema-4.26.0-py3-none-any.whl (90 kB)
+#19 170.0 Downloading narwhals-2.23.0-py3-none-any.whl (458 kB)
+#19 170.0 Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+#19 170.0 Using cached urllib3-2.7.0-py3-none-any.whl (131 kB)
+#19 170.1 Using cached attrs-26.1.0-py3-none-any.whl (67 kB)
+#19 170.1 Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl (18 kB)
+#19 170.2 Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (24 kB)
+#19 170.3 Downloading referencing-0.37.0-py3-none-any.whl (26 kB)
+#19 170.4 Downloading rpds_py-2026.6.3-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (368 kB)
+#19 170.6 Downloading smmap-5.0.3-py3-none-any.whl (24 kB)
+#19 171.1 Installing collected packages: websockets, watchdog, urllib3, typing-extensions, toml, tenacity, smmap, six, rpds-py, python-multipart, python-dotenv, pyarrow, psutil, protobuf, pillow, packaging, numpy, narwhals, MarkupSafe, itsdangerous, idna, httptools, h11, click, charset_normalizer, certifi, cachetools, blinker, attrs, annotated-types, uvicorn, typing-inspection, requests, referencing, python-dateutil, pydantic-core, jinja2, gitdb, anyio, starlette, pydeck, pydantic, pandas, jsonschema-specifications, gitpython, pydantic-settings, jsonschema, altair, streamlit
+#19 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 320.8 Downloading pytz-2026.2-py2.py3-none-any.whl (510 kB)
+#16 321.4 Downloading tzdata-2026.2-py2.py3-none-any.whl (349 kB)
+#16 323.0 Downloading urllib3-2.7.0-py3-none-any.whl (131 kB)
+#16 324.7 Downloading et_xmlfile-2.0.0-py3-none-any.whl (18 kB)
+#16 324.9 Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+#16 325.2 Building wheels for collected packages: stem
+#16 325.2   Building wheel for stem (pyproject.toml): started
+#16 326.5   Building wheel for stem (pyproject.toml): finished with status 'done'
+#16 326.5   Created wheel for stem: filename=stem-1.8.2-py3-none-any.whl size=436281 sha256=9eab40788d46879b30c08c9feda39efdfa6ab28f4fb6ebf34b1286d3c462d1a1
+#16 326.5   Stored in directory: /root/.cache/pip/wheels/91/3d/a8/3f5ed3c98e159d39092654ba746168d5bc58c1eb0d96702f8f
+#16 326.6 Successfully built stem
+#16 326.7 Installing collected packages: stem, speedtest-cli, pytz, ifaddr, zeroconf, urllib3, tzlocal, tzdata, typing-extensions, six, scapy, python-dotenv, PySocks, psutil, propcache, numpy, multidict, idna, h11, frozenlist, et-xmlfile, dbus-fast, colorama, click, charset_normalizer, certifi, attrs, annotated-types, annotated-doc, aiosqlite, aiohappyeyeballs, yarl, uvicorn, typing-inspection, requests, python-dateutil, pydantic-core, openpyxl, httpcore, bleak, apscheduler, anyio, aiosignal, starlette, requests-futures, pydantic, pandas, httpx, aiohttp, sherlock-project, python-telegram-bot, pydantic-settings, fastapi
+#16 401.0 Successfully installed PySocks-1.7.1 aiohappyeyeballs-2.7.1 aiohttp-3.14.1 aiosignal-1.4.0 aiosqlite-0.22.1 annotated-doc-0.0.4 annotated-types-0.7.0 anyio-4.14.1 apscheduler-3.11.3 attrs-26.1.0 bleak-3.0.2 certifi-2026.6.17 charset_normalizer-3.4.9 click-8.4.2 colorama-0.4.6 dbus-fast-5.0.22 et-xmlfile-2.0.0 fastapi-0.139.0 frozenlist-1.8.0 h11-0.16.0 httpcore-1.0.9 httpx-0.28.1 idna-3.18 ifaddr-0.2.0 multidict-6.7.1 numpy-2.5.1 openpyxl-3.1.5 pandas-2.3.3 propcache-0.5.2 psutil-7.2.2 pydantic-2.13.4 pydantic-core-2.46.4 pydantic-settings-2.14.2 python-dateutil-2.9.0.post0 python-dotenv-1.2.2 python-telegram-bot-22.8 pytz-2026.2 requests-2.34.2 requests-futures-1.0.2 scapy-2.7.0 sherlock-project-0.16.0 six-1.17.0 speedtest-cli-2.1.3 starlette-1.3.1 stem-1.8.2 typing-extensions-4.16.0 typing-inspection-0.4.2 tzdata-2026.2 tzlocal-5.4.4 urllib3-2.7.0 uvicorn-0.50.2 yarl-1.24.2 zeroconf-0.150.0
+#16 401.0 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#16 ...
+
+#19 [dashboard stage-0 5/6] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements-dashboard.txt
+#19 249.6 Successfully installed MarkupSafe-3.0.3 altair-6.2.2 annotated-types-0.7.0 anyio-4.14.1 attrs-26.1.0 blinker-1.9.0 cachetools-7.1.4 certifi-2026.6.17 charset_normalizer-3.4.9 click-8.4.2 gitdb-4.0.12 gitpython-3.1.50 h11-0.16.0 httptools-0.8.0 idna-3.18 itsdangerous-2.2.0 jinja2-3.1.6 jsonschema-4.26.0 jsonschema-specifications-2025.9.1 narwhals-2.23.0 numpy-2.5.1 packaging-26.2 pandas-3.0.3 pillow-12.3.0 protobuf-7.35.1 psutil-7.2.2 pyarrow-24.0.0 pydantic-2.13.4 pydantic-core-2.46.4 pydantic-settings-2.14.2 pydeck-0.9.3 python-dateutil-2.9.0.post0 python-dotenv-1.2.2 python-multipart-0.0.32 referencing-0.37.0 requests-2.34.2 rpds-py-2026.6.3 six-1.17.0 smmap-5.0.3 starlette-1.3.1 streamlit-1.59.0 tenacity-9.1.4 toml-0.10.2 typing-extensions-4.16.0 typing-inspection-0.4.2 urllib3-2.7.0 uvicorn-0.50.2 watchdog-6.0.0 websockets-16.0
+#19 249.6 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#19 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 409.6 
+#16 409.6 [notice] A new release of pip is available: 25.0.1 -> 26.1.2
+#16 409.6 [notice] To update, run: pip install --upgrade pip
+#16 ...
+
+#19 [dashboard stage-0 5/6] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements-dashboard.txt
+#19 286.9 
+#19 286.9 [notice] A new release of pip is available: 25.0.1 -> 26.1.2
+#19 286.9 [notice] To update, run: pip install --upgrade pip
+#19 DONE 473.6s
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 ...
+
+#20 [dashboard stage-0 6/6] COPY . .
+#20 ...
+
+#16 [bot stage-0 7/8] RUN --mount=type=cache,target=/root/.cache/pip     pip install -r requirements.txt
+#16 DONE 640.5s
+
+#20 [dashboard stage-0 6/6] COPY . .
+#20 ...
+
+#21 [sniffer stage-0 8/8] COPY . .
+#21 ...
+
+#20 [dashboard stage-0 6/6] COPY . .
+#20 DONE 426.6s
+
+#21 [bot stage-0 8/8] COPY . .
+#21 DONE 418.7s
+
+#22 [dashboard] exporting to image
+#22 exporting layers
+#22 ...
+
+#23 [sniffer] exporting to image
+#23 ...
+
+#24 [bot] exporting to image
+#24 ...
+
+#23 [sniffer] exporting to image
+#23 exporting layers 158.9s done
+#23 exporting manifest sha256:1b338b73f193e65038825893e800777999f35756f750179e6b85e62b7e975313 0.1s done
+#23 exporting config sha256:192465621f5f49f47af7ae80d8a4158d39a490a0fbc92145d5284bf605a20890
+#23 exporting config sha256:192465621f5f49f47af7ae80d8a4158d39a490a0fbc92145d5284bf605a20890 0.1s done
+#23 exporting attestation manifest sha256:e6b2ef686583c94f4e5771a683103bfdde0fafef7a7b2e32fabd9f1ceb221ebe
+#23 exporting attestation manifest sha256:e6b2ef686583c94f4e5771a683103bfdde0fafef7a7b2e32fabd9f1ceb221ebe 0.9s done
+#23 exporting manifest list sha256:58709e0741648eb39d27fd82349100c112776c56a07788294ffd46c6f7b98134
+#23 exporting manifest list sha256:58709e0741648eb39d27fd82349100c112776c56a07788294ffd46c6f7b98134 0.1s done
+#23 naming to docker.io/library/overwatcherpi-sniffer:latest
+#23 naming to docker.io/library/overwatcherpi-sniffer:latest 0.0s done
+#23 unpacking to docker.io/library/overwatcherpi-sniffer:latest
+#23 ...
+
+#22 [dashboard] exporting to image
+#22 exporting layers 159.3s done
+#22 exporting manifest sha256:f2ebef61d49785967c596e1b9f805cd3c907efc387489336172dbbb8eeaa90d1 0.1s done
+#22 exporting config sha256:62a5b15ecb66997705efc1db8e53caa76ebd7c07aab81639f423db6d168ab6a9 0.5s done
+#22 exporting attestation manifest sha256:dc82d7e0646bc2656dd580832d5b8eae7f39024eefbec121a10d8ac7c4879d0c 0.3s done
+#22 exporting manifest list sha256:50aeb3e2a4ade7f7ed9f73bc1b20351b66a9dd9a3fd0a5051d0fa0523c4ccc7d 0.1s done
+#22 naming to docker.io/library/overwatcherpi-dashboard:latest 0.0s done
+#22 unpacking to docker.io/library/overwatcherpi-dashboard:latest
+#22 ...
+
+#24 [bot] exporting to image
+#24 exporting layers 159.0s done
+#24 exporting manifest sha256:1a8b088d75d8e8743be581e79dd486b23ca01741076736afa040b3ee7d31ba3e 0.1s done
+#24 exporting config sha256:1ce27cc958d2074f7b6ff6fb1cf5e7ee1beb78345776e68be3f3505a0dab819d 0.1s done
+#24 exporting attestation manifest sha256:ce1a04aaef933f371c12ba83faf6353e5b86972f75dc1a12fffe214564641518 0.5s done
+#24 exporting manifest list sha256:3f0edb74a45837f3fdcebb97617ae5618fe4a52530b0663ca26f771c5b898de0 0.1s done
+#24 naming to docker.io/library/overwatcherpi-bot:latest 0.0s done
+#24 unpacking to docker.io/library/overwatcherpi-bot:latest
+#24 ...
+
+#22 [dashboard] exporting to image
+#22 unpacking to docker.io/library/overwatcherpi-dashboard:latest 513.2s done
+#22 DONE 703.1s
+
+#23 [sniffer] exporting to image
+#23 ...
+
+#25 [dashboard] resolving provenance for metadata file
+#25 DONE 14.8s
+
+#24 [bot] exporting to image
+#24 ...
+
+#23 [sniffer] exporting to image
+#23 unpacking to docker.io/library/overwatcherpi-sniffer:latest 827.7s done
+#23 DONE 991.9s
+
+#24 [bot] exporting to image
+#24 unpacking to docker.io/library/overwatcherpi-bot:latest 830.2s done
+#24 DONE 995.0s
+
+#26 [bot] resolving provenance for metadata file
+#26 ...
+
+#27 [sniffer] resolving provenance for metadata file
+#27 ...
+
+#26 [bot] resolving provenance for metadata file
+#26 DONE 59.1s
+
+#27 [sniffer] resolving provenance for metadata file
+#27 DONE 129.7s
+ Image overwatcherpi-bot Built 
+ Image overwatcherpi-dashboard Built 
+ Image overwatcherpi-sniffer Built 
