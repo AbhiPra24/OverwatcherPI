@@ -13,3 +13,5 @@ data/
 .env.bak
 data.bak/
 logs.bak/
+build/
+*.egg-info/

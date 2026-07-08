@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # OverwatcherPI Dashboard — Streamlit
 FROM python:3.12-slim
 
@@ -9,7 +10,8 @@ WORKDIR /app
 
 # Install dashboard-specific deps
 COPY dashboard/requirements-dashboard.txt .
-RUN pip install --no-cache-dir -r requirements-dashboard.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements-dashboard.txt
 
 # Copy entire repo so dashboard can import from core/config
 COPY . .

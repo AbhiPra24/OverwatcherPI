@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # OverwatcherPI — bot + sniffer image
 # Both services share this image; the compose file sets the command per-service.
 FROM python:3.12-slim
@@ -25,7 +26,8 @@ RUN groupadd -g 1000 overwatcher && \
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
 
 COPY . .
 

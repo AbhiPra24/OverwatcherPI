@@ -28,3 +28,7 @@ Thumbs.db
 .env.bak
 data.bak/
 logs.bak/
+
+# Build artifacts
+build/
+*.egg-info/
