@@ -13,6 +13,7 @@ from core.database import DatabaseManager
 from config import config
 from core.job_queue import JobQueue
 from core.scan_limits import SCAN_LOCK
+from scanners import network, bluetooth
 import time
 
 def check_cooldown(context: ContextTypes.DEFAULT_TYPE, command_name: str, cooldown_s: int = 30) -> float:
@@ -125,7 +126,6 @@ async def speedtest_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # timeout). Instead: load all servers, sort by distance, probe the
         # 5 closest, and pick the one with the lowest real latency.
         st.get_servers()
-        st.get_best_server(st.get_servers())
         server = st.get_best_server()
         ping = server.get("latency", 0)
         # Sanity check: if latency is absurdly high (>5000 ms), the server
