@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from pathlib import Path
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram.ext import Application
 from telegram.constants import ParseMode
@@ -166,6 +167,7 @@ async def scheduled_speedtest_job(app: Application):
         st = speedtest.Speedtest()
         
         st.get_servers()
+        st.get_best_server(st.get_servers())
         server = st.get_best_server()
         ping = server.get("latency", 0)
         
@@ -616,53 +618,68 @@ async def db_retention_job(app: Application):
     """Daily job to prune old rows from unbounded tables (scan_history, events, dns_queries)."""
     if config.db_retention_days <= 0 and config.dns_retention_days <= 0:
         return
-        
+
     logger.info("Running DB retention job...")
     try:
         db = await DatabaseManager.get_db()
         current_time = datetime.now().timestamp()
-        
+
         if config.db_retention_days > 0:
             cutoff = current_time - (config.db_retention_days * 86400)
-            await db.execute("DELETE FROM scan_history WHERE scan_time < ?", (cutoff,))
-            await db.execute("DELETE FROM events WHERE timestamp < ?", (cutoff,))
-            
+            await db.execute("DELETE FROM scan_history WHERE scan_time < $1", cutoff)
+            await db.execute("DELETE FROM events WHERE timestamp < $1", cutoff)
+
         if config.dns_retention_days > 0:
             dns_cutoff = current_time - (config.dns_retention_days * 86400)
-            await db.execute("DELETE FROM dns_queries WHERE timestamp < ?", (dns_cutoff,))
-            
-        await db.commit()
+            await db.execute("DELETE FROM dns_queries WHERE timestamp < $1", dns_cutoff)
+
         logger.info("DB retention job completed.")
         await DatabaseManager.record_scan_heartbeat("db_retention")
     except Exception as e:
         logger.error(f"DB retention job failed: {e}")
 
 async def db_backup_job(app: Application):
-    """Daily job to safely backup the WAL-mode database."""
+    """Daily job to back up every table to gzip-compressed CSV.
+
+    Replaces the old sqlite3.Connection.backup() hot-copy (no Postgres
+    equivalent) with a per-table COPY export via asyncpg, same pattern as
+    PortfolioPi's migrated db_backup_job."""
     logger.info("Running DB backup job...")
     try:
+        import gzip
+
+        db = await DatabaseManager.get_db()
         backup_dir = Path("data/backups")
         backup_dir.mkdir(parents=True, exist_ok=True)
-        
+
         timestamp = datetime.now().strftime("%Y%m%d")
-        backup_file = backup_dir / f"netmon-{timestamp}.db"
-        
-        def perform_backup(src_db_path: str, dst_db_path: str):
-            import sqlite3
-            with sqlite3.connect(src_db_path) as src, sqlite3.connect(dst_db_path) as dst:
-                src.backup(dst)
-                
-        await asyncio.to_thread(perform_backup, str(config.db_path), str(backup_file))
-        logger.info(f"DB backup created at {backup_file}")
-        
+        tables = [
+            "network_devices", "scan_history", "dns_queries", "bt_devices", "oui_mappings",
+            "monitored_hosts", "device_ports", "port_history", "events", "jobs",
+            "ble_alert_cooldown", "honeypot_alert_cooldown", "resource_alert_cooldown",
+            "latency_samples", "deferred_scans", "job_heartbeats", "device_maintenance",
+        ]
+
+        async with db.acquire() as conn:
+            for table in tables:
+                backup_file = backup_dir / f"{table}_{timestamp}.csv.gz"
+                if backup_file.exists():
+                    backup_file.unlink()
+                with gzip.open(backup_file, "wb") as f:
+                    await conn.copy_from_query(f"SELECT * FROM {table}", output=f, format="csv", header=True)
+
+        logger.info(f"Database backed up to {backup_dir} ({len(tables)} tables)")
+
         # Enforce retention
         if config.db_backup_retention_days > 0:
-            backups = sorted(backup_dir.glob("netmon-*.db"))
-            if len(backups) > config.db_backup_retention_days:
-                for old_backup in backups[:-config.db_backup_retention_days]:
-                    old_backup.unlink()
-                    logger.info(f"Deleted old backup: {old_backup.name}")
-                    
+            backups = sorted(backup_dir.glob("*.csv.gz"))
+            dates = sorted({b.name.rsplit("_", 1)[-1].replace(".csv.gz", "") for b in backups})
+            if len(dates) > config.db_backup_retention_days:
+                for old_date in dates[:-config.db_backup_retention_days]:
+                    for old_backup in backup_dir.glob(f"*_{old_date}.csv.gz"):
+                        old_backup.unlink()
+                logger.info(f"Deleted backups older than {config.db_backup_retention_days} days")
+
         await DatabaseManager.record_scan_heartbeat("db_backup")
     except Exception as e:
         logger.error(f"DB backup job failed: {e}")

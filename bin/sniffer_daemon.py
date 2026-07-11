@@ -87,8 +87,9 @@ async def main():
         if hasattr(dns_watcher, "_batch") and dns_watcher._batch:
             logger.info("Flushing DNS watcher buffers before shutdown...")
             try:
+                from core.db import init_pool
                 from core.database import DatabaseManager
-                await DatabaseManager.get_db()
+                await init_pool()
                 await DatabaseManager.insert_dns_queries(dns_watcher._batch)
                 dns_watcher._batch.clear()
                 await DatabaseManager.close()

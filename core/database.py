@@ -1,14 +1,12 @@
 import time
 import json
 import logging
-from dataclasses import dataclass
 from typing import Optional, List, Tuple, Set
 
-import asyncio
-import aiosqlite
 from pydantic import BaseModel
 
 from config import config
+from core.db import get_pool
 
 logger = logging.getLogger(__name__)
 
@@ -48,240 +46,191 @@ class HourlyStats(BaseModel):
 
 
 class DatabaseManager:
-    """Singleton database manager handling connections and queries."""
-    
-    _db: Optional[aiosqlite.Connection] = None
-    _lock = asyncio.Lock()
+    """Postgres (Supabase) access layer. Every classmethod acquires a
+    connection from the shared pool (core/db.py) per call; a few (marked
+    below) explicitly wrap multiple statements in a transaction to preserve
+    the atomicity the old single-SQLite-connection-plus-commit() pattern
+    gave for free."""
 
     @classmethod
-    async def get_db(cls) -> aiosqlite.Connection:
-        if cls._db is None:
-            async with cls._lock:
-                if cls._db is None:
-                    # Ensure directory exists
-                    config.db_path.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    cls._db = await aiosqlite.connect(config.db_path)
-                    cls._db.row_factory = aiosqlite.Row
-                    
-                    # Apply production pragmas (especially WAL mode for concurrent readers/writers)
-                    await cls._db.execute("PRAGMA journal_mode=WAL;")
-                    await cls._db.execute("PRAGMA synchronous=NORMAL;")
-                    await cls._db.execute("PRAGMA foreign_keys=ON;")
-                    await cls._db.execute("PRAGMA cache_size=-65536;")
-                    await cls._db.commit()
-                    
-                    await cls._init_tables(cls._db)
-            
-        return cls._db
+    async def get_db(cls):
+        """Returns the shared connection pool. Kept as a classmethod (rather
+        than having every caller import core.db directly) so existing raw
+        `db = await DatabaseManager.get_db(); await db.execute(...)` call
+        sites elsewhere in the codebase keep working unchanged — asyncpg.Pool
+        exposes the same execute()/fetch()/fetchval() convenience methods a
+        single connection does."""
+        return get_pool()
 
     @classmethod
     async def close(cls):
-        if cls._db is not None:
-            await cls._db.close()
-            cls._db = None
+        from core.db import close_pool
+        await close_pool()
 
-    @staticmethod
-    async def _init_tables(db: aiosqlite.Connection):
-        """Create tables if they don't exist."""
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS network_devices (
-                mac TEXT PRIMARY KEY,
-                ip TEXT,
-                vendor TEXT,
-                hostname TEXT,
-                first_seen REAL NOT NULL,
-                last_seen REAL NOT NULL,
-                is_active INTEGER DEFAULT 1,
-                raw_mdns_name TEXT,
-                raw_ssdp_server TEXT,
-                raw_netbios_name TEXT
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS scan_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                scan_time REAL NOT NULL,
-                device_count INTEGER NOT NULL
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS dns_queries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp REAL NOT NULL,
-                src_ip TEXT NOT NULL,
-                query_name TEXT NOT NULL,
-                query_type TEXT
-            )
-        """)
-        
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_dns_queries_src_ts ON dns_queries(src_ip, timestamp)")
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS bt_devices (
-                address TEXT PRIMARY KEY,
-                name TEXT,
-                rssi INTEGER,
-                last_seen REAL NOT NULL,
-                manufacturer_data_hex TEXT,
-                service_uuids TEXT
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS oui_mappings (
-                mac_prefix TEXT PRIMARY KEY,
-                vendor TEXT NOT NULL
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS monitored_hosts (
-                ip TEXT PRIMARY KEY,
-                is_active INTEGER DEFAULT 1
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS device_ports (
-                mac TEXT,
-                port INTEGER,
-                service TEXT,
-                first_seen REAL NOT NULL,
-                last_seen REAL NOT NULL,
-                is_active INTEGER DEFAULT 1,
-                PRIMARY KEY (mac, port)
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS port_history (
-                mac TEXT,
-                port INTEGER,
-                service TEXT,
-                event TEXT,
-                timestamp REAL
-            )
-        """)
-        
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_port_history_mac ON port_history(mac)")
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp REAL NOT NULL,
-                category TEXT NOT NULL,
-                severity TEXT NOT NULL,
-                message TEXT NOT NULL,
-                related_id TEXT
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS jobs (
-                id TEXT PRIMARY KEY,
-                job_type TEXT,
-                target TEXT,
-                status TEXT,
-                requester_chat_id INTEGER,
-                created_at REAL,
-                started_at REAL,
-                finished_at REAL,
-                result_summary TEXT,
-                result_path TEXT,
-                error TEXT
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS ble_alert_cooldown (
-                vendor_key TEXT PRIMARY KEY,
-                last_alert_at REAL NOT NULL
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS honeypot_alert_cooldown (
-                src_ip TEXT PRIMARY KEY,
-                last_alert_at REAL NOT NULL
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS resource_alert_cooldown (
-                metric_key TEXT PRIMARY KEY,
-                last_alert_at REAL NOT NULL
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS latency_samples (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp REAL NOT NULL,
-                target TEXT NOT NULL,
-                loss_pct REAL,
-                jitter_ms REAL
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS deferred_scans (
-                mac TEXT PRIMARY KEY,
-                ip TEXT NOT NULL,
-                queued_at REAL NOT NULL
-            )
-        """)
-        
-        await db.commit()
-        
-        # Add is_known column if it doesn't exist (schema migration)
-        cursor = await db.execute("PRAGMA table_info(network_devices)")
-        cols = [row["name"] for row in await cursor.fetchall()]
-        if "is_known" not in cols:
-            await db.execute("ALTER TABLE network_devices ADD COLUMN is_known INTEGER DEFAULT 0")
-        if "raw_mdns_name" not in cols:
-            await db.execute("ALTER TABLE network_devices ADD COLUMN raw_mdns_name TEXT")
-            await db.execute("ALTER TABLE network_devices ADD COLUMN raw_ssdp_server TEXT")
-            await db.execute("ALTER TABLE network_devices ADD COLUMN raw_netbios_name TEXT")
-        if "banner_grab_attempted_at" not in cols:
-            await db.execute("ALTER TABLE network_devices ADD COLUMN banner_grab_attempted_at REAL")
-            await db.execute("ALTER TABLE network_devices ADD COLUMN banner_grab_attempts INTEGER DEFAULT 0")
-        if "friendly_name" not in cols:
-            await db.execute("ALTER TABLE network_devices ADD COLUMN friendly_name TEXT")
-            await db.execute("ALTER TABLE network_devices ADD COLUMN device_type TEXT")
-            await db.execute("ALTER TABLE network_devices ADD COLUMN owner TEXT")
-            
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS job_heartbeats (
-                job_name TEXT PRIMARY KEY,
-                last_run_at REAL
-            )
-        """)
-        
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS device_maintenance (
-                mac TEXT PRIMARY KEY,
-                until_timestamp REAL NOT NULL,
-                reason TEXT
-            )
-        """)
-            
-        cursor = await db.execute("PRAGMA table_info(bt_devices)")
-        cols = [row["name"] for row in await cursor.fetchall()]
-        if "is_known" not in cols:
-            await db.execute("ALTER TABLE bt_devices ADD COLUMN is_known INTEGER DEFAULT 0")
-        if "manufacturer_data_hex" not in cols:
-            await db.execute("ALTER TABLE bt_devices ADD COLUMN manufacturer_data_hex TEXT")
-            await db.execute("ALTER TABLE bt_devices ADD COLUMN service_uuids TEXT")
-        if "tx_power" not in cols:
-            await db.execute("ALTER TABLE bt_devices ADD COLUMN tx_power INTEGER")
-            await db.execute("ALTER TABLE bt_devices ADD COLUMN rssi_history TEXT DEFAULT '[]'")
-        if "fingerprint" not in cols:
-            await db.execute("ALTER TABLE bt_devices ADD COLUMN fingerprint TEXT")
+    @classmethod
+    async def init_db(cls):
+        """Create tables if they don't exist. No ALTER-TABLE schema
+        versioning needed here (unlike the old SQLite-era _init_tables) —
+        this is a fresh Postgres schema with every column declared upfront."""
+        pool = get_pool()
+        async with pool.acquire() as db:
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS network_devices (
+                    mac TEXT PRIMARY KEY,
+                    ip TEXT,
+                    vendor TEXT,
+                    hostname TEXT,
+                    first_seen DOUBLE PRECISION NOT NULL,
+                    last_seen DOUBLE PRECISION NOT NULL,
+                    is_active INTEGER DEFAULT 1,
+                    raw_mdns_name TEXT,
+                    raw_ssdp_server TEXT,
+                    raw_netbios_name TEXT,
+                    is_known INTEGER DEFAULT 0,
+                    banner_grab_attempted_at DOUBLE PRECISION,
+                    banner_grab_attempts INTEGER DEFAULT 0,
+                    friendly_name TEXT,
+                    device_type TEXT,
+                    owner TEXT
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS scan_history (
+                    id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                    scan_time DOUBLE PRECISION NOT NULL,
+                    device_count INTEGER NOT NULL
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS dns_queries (
+                    id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                    timestamp DOUBLE PRECISION NOT NULL,
+                    src_ip TEXT NOT NULL,
+                    query_name TEXT NOT NULL,
+                    query_type TEXT
+                )
+            """)
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_dns_queries_src_ts ON dns_queries(src_ip, timestamp)")
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS bt_devices (
+                    address TEXT PRIMARY KEY,
+                    name TEXT,
+                    rssi INTEGER,
+                    last_seen DOUBLE PRECISION NOT NULL,
+                    manufacturer_data_hex TEXT,
+                    service_uuids TEXT,
+                    is_known INTEGER DEFAULT 0,
+                    tx_power INTEGER,
+                    rssi_history TEXT DEFAULT '[]',
+                    fingerprint TEXT
+                )
+            """)
             await db.execute("CREATE INDEX IF NOT EXISTS idx_bt_devices_fingerprint ON bt_devices(fingerprint)")
-            
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS oui_mappings (
+                    mac_prefix TEXT PRIMARY KEY,
+                    vendor TEXT NOT NULL
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS monitored_hosts (
+                    ip TEXT PRIMARY KEY,
+                    is_active INTEGER DEFAULT 1
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS device_ports (
+                    mac TEXT,
+                    port INTEGER,
+                    service TEXT,
+                    first_seen DOUBLE PRECISION NOT NULL,
+                    last_seen DOUBLE PRECISION NOT NULL,
+                    is_active INTEGER DEFAULT 1,
+                    PRIMARY KEY (mac, port)
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS port_history (
+                    mac TEXT,
+                    port INTEGER,
+                    service TEXT,
+                    event TEXT,
+                    timestamp DOUBLE PRECISION
+                )
+            """)
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_port_history_mac ON port_history(mac)")
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS events (
+                    id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                    timestamp DOUBLE PRECISION NOT NULL,
+                    category TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    related_id TEXT
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS jobs (
+                    id TEXT PRIMARY KEY,
+                    job_type TEXT,
+                    target TEXT,
+                    status TEXT,
+                    requester_chat_id BIGINT,
+                    created_at DOUBLE PRECISION,
+                    started_at DOUBLE PRECISION,
+                    finished_at DOUBLE PRECISION,
+                    result_summary TEXT,
+                    result_path TEXT,
+                    error TEXT
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS ble_alert_cooldown (
+                    vendor_key TEXT PRIMARY KEY,
+                    last_alert_at DOUBLE PRECISION NOT NULL
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS honeypot_alert_cooldown (
+                    src_ip TEXT PRIMARY KEY,
+                    last_alert_at DOUBLE PRECISION NOT NULL
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS resource_alert_cooldown (
+                    metric_key TEXT PRIMARY KEY,
+                    last_alert_at DOUBLE PRECISION NOT NULL
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS latency_samples (
+                    id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                    timestamp DOUBLE PRECISION NOT NULL,
+                    target TEXT NOT NULL,
+                    loss_pct DOUBLE PRECISION,
+                    jitter_ms DOUBLE PRECISION
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS deferred_scans (
+                    mac TEXT PRIMARY KEY,
+                    ip TEXT NOT NULL,
+                    queued_at DOUBLE PRECISION NOT NULL
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS job_heartbeats (
+                    job_name TEXT PRIMARY KEY,
+                    last_run_at DOUBLE PRECISION
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS device_maintenance (
+                    mac TEXT PRIMARY KEY,
+                    until_timestamp DOUBLE PRECISION NOT NULL,
+                    reason TEXT
+                )
+            """)
         logger.info("Database tables initialized.")
 
     @classmethod
@@ -290,78 +239,75 @@ class DatabaseManager:
         Upsert a batch of devices.
         Returns a tuple: (set of newly discovered MACs, set of MACs that went offline).
         """
-        db = await cls.get_db()
+        pool = get_pool()
         current_time = time.time()
         current_macs = {d.mac for d in devices}
-        
-        # Determine newly discovered MACs
-        cursor = await db.execute("SELECT mac FROM network_devices")
-        known_macs = {row["mac"] for row in await cursor.fetchall()}
-        new_macs = current_macs - known_macs
-        
-        # Upsert devices
-        await db.executemany("""
-            INSERT INTO network_devices (mac, ip, vendor, hostname, first_seen, last_seen, is_active, raw_mdns_name, raw_ssdp_server, raw_netbios_name)
-            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
-            ON CONFLICT(mac) DO UPDATE SET
-                ip = excluded.ip,
-                vendor = excluded.vendor,
-                hostname = CASE WHEN excluded.hostname != '' THEN excluded.hostname ELSE network_devices.hostname END,
-                last_seen = excluded.last_seen,
-                is_active = 1,
-                raw_mdns_name = CASE WHEN excluded.raw_mdns_name IS NOT NULL THEN excluded.raw_mdns_name ELSE network_devices.raw_mdns_name END,
-                raw_ssdp_server = CASE WHEN excluded.raw_ssdp_server IS NOT NULL THEN excluded.raw_ssdp_server ELSE network_devices.raw_ssdp_server END,
-                raw_netbios_name = CASE WHEN excluded.raw_netbios_name IS NOT NULL THEN excluded.raw_netbios_name ELSE network_devices.raw_netbios_name END
-        """, [(d.mac, d.ip, d.vendor, d.hostname, current_time, current_time, d.raw_mdns_name, d.raw_ssdp_server, d.raw_netbios_name) for d in devices])
-        
-        # Mark missing devices as inactive, but only after a grace period of missed
-        # scans — battery/power-save devices (phones, watches, IoT plugs) routinely
-        # skip a single ARP reply without actually leaving the network.
-        grace_cutoff = current_time - (config.device_offline_grace_minutes * 60)
-        if current_macs:
-            placeholders = ",".join("?" * len(current_macs))
-            query = f"""
-                SELECT mac FROM network_devices
-                WHERE is_active = 1 AND mac NOT IN ({placeholders}) AND last_seen < ?
-            """
-            cursor = await db.execute(query, list(current_macs) + [grace_cutoff])
-            gone_macs = {row["mac"] for row in await cursor.fetchall()}
+        current_macs_list = list(current_macs)
 
-            await db.execute(
-                f"UPDATE network_devices SET is_active = 0 WHERE mac NOT IN ({placeholders}) AND last_seen < ?",
-                list(current_macs) + [grace_cutoff]
-            )
-        else:
-            # Everything is gone (empty scan) — still respect the grace period.
-            cursor = await db.execute("SELECT mac FROM network_devices WHERE is_active = 1 AND last_seen < ?", (grace_cutoff,))
-            gone_macs = {row["mac"] for row in await cursor.fetchall()}
-            await db.execute("UPDATE network_devices SET is_active = 0 WHERE last_seen < ?", (grace_cutoff,))
+        async with pool.acquire() as db:
+            async with db.transaction():
+                # Determine newly discovered MACs
+                known_rows = await db.fetch("SELECT mac FROM network_devices")
+                known_macs = {row["mac"] for row in known_rows}
+                new_macs = current_macs - known_macs
 
-        # Record scan history
-        await db.execute(
-            "INSERT INTO scan_history (scan_time, device_count) VALUES (?, ?)", 
-            (current_time, len(devices))
-        )
-        
-        await db.commit()
-        
+                # Upsert devices
+                await db.executemany("""
+                    INSERT INTO network_devices (mac, ip, vendor, hostname, first_seen, last_seen, is_active, raw_mdns_name, raw_ssdp_server, raw_netbios_name)
+                    VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, $9)
+                    ON CONFLICT(mac) DO UPDATE SET
+                        ip = excluded.ip,
+                        vendor = excluded.vendor,
+                        hostname = CASE WHEN excluded.hostname != '' THEN excluded.hostname ELSE network_devices.hostname END,
+                        last_seen = excluded.last_seen,
+                        is_active = 1,
+                        raw_mdns_name = CASE WHEN excluded.raw_mdns_name IS NOT NULL THEN excluded.raw_mdns_name ELSE network_devices.raw_mdns_name END,
+                        raw_ssdp_server = CASE WHEN excluded.raw_ssdp_server IS NOT NULL THEN excluded.raw_ssdp_server ELSE network_devices.raw_ssdp_server END,
+                        raw_netbios_name = CASE WHEN excluded.raw_netbios_name IS NOT NULL THEN excluded.raw_netbios_name ELSE network_devices.raw_netbios_name END
+                """, [(d.mac, d.ip, d.vendor, d.hostname, current_time, current_time, d.raw_mdns_name, d.raw_ssdp_server, d.raw_netbios_name) for d in devices])
+
+                # Mark missing devices as inactive, but only after a grace period of missed
+                # scans — battery/power-save devices (phones, watches, IoT plugs) routinely
+                # skip a single ARP reply without actually leaving the network.
+                grace_cutoff = current_time - (config.device_offline_grace_minutes * 60)
+                if current_macs_list:
+                    gone_rows = await db.fetch(
+                        "SELECT mac FROM network_devices WHERE is_active = 1 AND mac != ALL($1::text[]) AND last_seen < $2",
+                        current_macs_list, grace_cutoff,
+                    )
+                    gone_macs = {row["mac"] for row in gone_rows}
+                    await db.execute(
+                        "UPDATE network_devices SET is_active = 0 WHERE mac != ALL($1::text[]) AND last_seen < $2",
+                        current_macs_list, grace_cutoff,
+                    )
+                else:
+                    # Everything is gone (empty scan) — still respect the grace period.
+                    gone_rows = await db.fetch("SELECT mac FROM network_devices WHERE is_active = 1 AND last_seen < $1", grace_cutoff)
+                    gone_macs = {row["mac"] for row in gone_rows}
+                    await db.execute("UPDATE network_devices SET is_active = 0 WHERE last_seen < $1", grace_cutoff)
+
+                # Record scan history
+                await db.execute(
+                    "INSERT INTO scan_history (scan_time, device_count) VALUES ($1, $2)",
+                    current_time, len(devices),
+                )
+
         for d in devices:
             if d.mac in new_macs:
                 d.is_new = True
-                
+
         return new_macs, gone_macs
 
     @classmethod
     async def get_active_devices(cls) -> List[NetworkDevice]:
         """Get all currently active devices."""
-        db = await cls.get_db()
-        cursor = await db.execute("""
-            SELECT mac, ip, vendor, hostname, friendly_name, device_type, owner 
-            FROM network_devices 
+        pool = get_pool()
+        rows = await pool.fetch("""
+            SELECT mac, ip, vendor, hostname, friendly_name, device_type, owner
+            FROM network_devices
             WHERE is_active = 1
             ORDER BY ip
         """)
-        rows = await cursor.fetchall()
         return [NetworkDevice(
             mac=r["mac"], ip=r["ip"], vendor=r["vendor"], hostname=r["hostname"],
             friendly_name=r["friendly_name"], device_type=r["device_type"], owner=r["owner"]
@@ -369,127 +315,107 @@ class DatabaseManager:
 
     @classmethod
     async def set_device_name(cls, mac: str, name: str) -> bool:
-        db = await cls.get_db()
-        cur = await db.execute("UPDATE network_devices SET friendly_name = ? WHERE mac = ?", (name, mac))
-        await db.commit()
-        return cur.rowcount > 0
+        pool = get_pool()
+        result = await pool.execute("UPDATE network_devices SET friendly_name = $1 WHERE mac = $2", name, mac)
+        return result.split()[-1] != "0"
 
     @classmethod
     async def upsert_bt_devices(cls, devices: List[BLEDevice]) -> Set[str]:
-        db = await cls.get_db()
+        pool = get_pool()
         current_time = time.time()
         current_macs = {d.address for d in devices}
-        
-        cursor = await db.execute("SELECT address FROM bt_devices")
-        known_macs = {row["address"] for row in await cursor.fetchall()}
-        new_macs = current_macs - known_macs
-        
-        existing_histories = {}
-        if current_macs:
-            placeholders = ",".join("?" * len(current_macs))
-            cursor = await db.execute(f"SELECT address, rssi_history FROM bt_devices WHERE address IN ({placeholders})", list(current_macs))
-            for row in await cursor.fetchall():
-                try:
-                    existing_histories[row["address"]] = json.loads(row["rssi_history"] or "[]")
-                except json.JSONDecodeError:
-                    existing_histories[row["address"]] = []
+        current_macs_list = list(current_macs)
 
-        upsert_data = []
-        for d in devices:
-            hist = existing_histories.get(d.address, [])
-            hist.append(d.rssi)
-            hist = hist[-5:]  # Keep last 5 samples
-            d.rssi_history = json.dumps(hist)
-            upsert_data.append((d.address, d.name, d.rssi, current_time, d.manufacturer_data_hex, d.service_uuids, d.tx_power, d.rssi_history, d.fingerprint))
+        async with pool.acquire() as db:
+            known_rows = await db.fetch("SELECT address FROM bt_devices")
+            known_macs = {row["address"] for row in known_rows}
+            new_macs = current_macs - known_macs
 
-        await db.executemany("""
-            INSERT INTO bt_devices (address, name, rssi, last_seen, manufacturer_data_hex, service_uuids, tx_power, rssi_history, fingerprint)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(address) DO UPDATE SET
-                name = CASE WHEN excluded.name != 'Unknown' AND excluded.name != '' THEN excluded.name ELSE bt_devices.name END,
-                rssi = excluded.rssi,
-                last_seen = excluded.last_seen,
-                manufacturer_data_hex = CASE WHEN excluded.manufacturer_data_hex IS NOT NULL THEN excluded.manufacturer_data_hex ELSE bt_devices.manufacturer_data_hex END,
-                service_uuids = CASE WHEN excluded.service_uuids IS NOT NULL THEN excluded.service_uuids ELSE bt_devices.service_uuids END,
-                tx_power = excluded.tx_power,
-                rssi_history = excluded.rssi_history,
-                fingerprint = CASE WHEN excluded.fingerprint IS NOT NULL THEN excluded.fingerprint ELSE bt_devices.fingerprint END
-        """, upsert_data)
-        
-        await db.commit()
+            existing_histories = {}
+            if current_macs_list:
+                rows = await db.fetch(
+                    "SELECT address, rssi_history FROM bt_devices WHERE address = ANY($1::text[])", current_macs_list
+                )
+                for row in rows:
+                    try:
+                        existing_histories[row["address"]] = json.loads(row["rssi_history"] or "[]")
+                    except json.JSONDecodeError:
+                        existing_histories[row["address"]] = []
+
+            upsert_data = []
+            for d in devices:
+                hist = existing_histories.get(d.address, [])
+                hist.append(d.rssi)
+                hist = hist[-5:]  # Keep last 5 samples
+                d.rssi_history = json.dumps(hist)
+                upsert_data.append((d.address, d.name, d.rssi, current_time, d.manufacturer_data_hex, d.service_uuids, d.tx_power, d.rssi_history, d.fingerprint))
+
+            await db.executemany("""
+                INSERT INTO bt_devices (address, name, rssi, last_seen, manufacturer_data_hex, service_uuids, tx_power, rssi_history, fingerprint)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                ON CONFLICT(address) DO UPDATE SET
+                    name = CASE WHEN excluded.name != 'Unknown' AND excluded.name != '' THEN excluded.name ELSE bt_devices.name END,
+                    rssi = excluded.rssi,
+                    last_seen = excluded.last_seen,
+                    manufacturer_data_hex = CASE WHEN excluded.manufacturer_data_hex IS NOT NULL THEN excluded.manufacturer_data_hex ELSE bt_devices.manufacturer_data_hex END,
+                    service_uuids = CASE WHEN excluded.service_uuids IS NOT NULL THEN excluded.service_uuids ELSE bt_devices.service_uuids END,
+                    tx_power = excluded.tx_power,
+                    rssi_history = excluded.rssi_history,
+                    fingerprint = CASE WHEN excluded.fingerprint IS NOT NULL THEN excluded.fingerprint ELSE bt_devices.fingerprint END
+            """, upsert_data)
+
         return new_macs
 
     @classmethod
     async def mark_known(cls, mac: str) -> bool:
-        db = await cls.get_db()
-        cur1 = await db.execute("UPDATE network_devices SET is_known = 1 WHERE mac = ?", (mac,))
-        cur2 = await db.execute("UPDATE bt_devices SET is_known = 1 WHERE address = ?", (mac,))
-        await db.commit()
-        return cur1.rowcount > 0 or cur2.rowcount > 0
-        
+        pool = get_pool()
+        async with pool.acquire() as db:
+            async with db.transaction():
+                r1 = await db.execute("UPDATE network_devices SET is_known = 1 WHERE mac = $1", mac)
+                r2 = await db.execute("UPDATE bt_devices SET is_known = 1 WHERE address = $1", mac)
+        return r1.split()[-1] != "0" or r2.split()[-1] != "0"
+
     @classmethod
     async def is_known(cls, mac: str) -> bool:
-        db = await cls.get_db()
-        cur1 = await db.execute("SELECT is_known FROM network_devices WHERE mac = ?", (mac,))
-        row1 = await cur1.fetchone()
-        if row1 and row1["is_known"] == 1:
+        pool = get_pool()
+        val1 = await pool.fetchval("SELECT is_known FROM network_devices WHERE mac = $1", mac)
+        if val1 == 1:
             return True
-            
-        cur2 = await db.execute("SELECT is_known FROM bt_devices WHERE address = ?", (mac,))
-        row2 = await cur2.fetchone()
-        if row2 and row2["is_known"] == 1:
+        val2 = await pool.fetchval("SELECT is_known FROM bt_devices WHERE address = $1", mac)
+        if val2 == 1:
             return True
-            
         return False
 
     @classmethod
     async def was_fingerprint_seen_recently(cls, fingerprint: str, hours: float = 24.0) -> bool:
         if not fingerprint:
             return False
-        db = await cls.get_db()
+        pool = get_pool()
         cutoff = time.time() - (hours * 3600)
-        cursor = await db.execute("SELECT 1 FROM bt_devices WHERE fingerprint = ? AND last_seen >= ? LIMIT 1", (fingerprint, cutoff))
-        return await cursor.fetchone() is not None
+        val = await pool.fetchval("SELECT 1 FROM bt_devices WHERE fingerprint = $1 AND last_seen >= $2 LIMIT 1", fingerprint, cutoff)
+        return val is not None
 
     @classmethod
     async def get_hourly_stats(cls, hours: int = 1) -> HourlyStats:
         """Compute network statistics over the last `hours` window."""
-        db = await cls.get_db()
+        pool = get_pool()
         cutoff_time = time.time() - (hours * 3600)
-        
-        # Avg devices over the period
-        cursor = await db.execute(
-            "SELECT AVG(device_count) as avg_count FROM scan_history WHERE scan_time >= ?", 
-            (cutoff_time,)
+
+        avg_count = await pool.fetchval(
+            "SELECT AVG(device_count) FROM scan_history WHERE scan_time >= $1", cutoff_time
         )
-        row = await cursor.fetchone()
-        avg_count = row["avg_count"] if row and row["avg_count"] is not None else 0.0
-        
-        # New devices in this window (first_seen in the window)
-        cursor = await db.execute(
-            "SELECT mac FROM network_devices WHERE first_seen >= ?", 
-            (cutoff_time,)
-        )
-        new_macs = [r["mac"] for r in await cursor.fetchall()]
-        
-        # Gone devices (inactive, and last seen in the window but not currently active)
-        cursor = await db.execute(
-            "SELECT mac FROM network_devices WHERE is_active = 0 AND last_seen >= ?", 
-            (cutoff_time,)
-        )
-        gone_macs = [r["mac"] for r in await cursor.fetchall()]
-        
-        # BT devices seen in window
-        cursor = await db.execute(
-            "SELECT COUNT(address) as count FROM bt_devices WHERE last_seen >= ?",
-            (cutoff_time,)
-        )
-        bt_count = (await cursor.fetchone())["count"]
-        
-        # Active unwhitelisted devices
-        cursor = await db.execute("SELECT COUNT(*) as count FROM network_devices WHERE is_active = 1 AND is_known = 0")
-        unwhitelisted_count = (await cursor.fetchone())["count"]
-        
+        avg_count = avg_count if avg_count is not None else 0.0
+
+        new_rows = await pool.fetch("SELECT mac FROM network_devices WHERE first_seen >= $1", cutoff_time)
+        new_macs = [r["mac"] for r in new_rows]
+
+        gone_rows = await pool.fetch("SELECT mac FROM network_devices WHERE is_active = 0 AND last_seen >= $1", cutoff_time)
+        gone_macs = [r["mac"] for r in gone_rows]
+
+        bt_count = await pool.fetchval("SELECT COUNT(address) FROM bt_devices WHERE last_seen >= $1", cutoff_time)
+
+        unwhitelisted_count = await pool.fetchval("SELECT COUNT(*) FROM network_devices WHERE is_active = 1 AND is_known = 0")
+
         return HourlyStats(
             avg_network_devices=round(avg_count, 1),
             new_macs=new_macs,
@@ -501,54 +427,48 @@ class DatabaseManager:
     # OUI Cache Methods
     @classmethod
     async def oui_count(cls) -> int:
-        db = await cls.get_db()
-        cursor = await db.execute("SELECT COUNT(*) as count FROM oui_mappings")
-        return (await cursor.fetchone())["count"]
+        pool = get_pool()
+        return await pool.fetchval("SELECT COUNT(*) FROM oui_mappings")
 
     @classmethod
     async def add_monitored_host(cls, ip: str) -> bool:
-        db = await cls.get_db()
-        await db.execute("INSERT OR REPLACE INTO monitored_hosts (ip, is_active) VALUES (?, 1)", (ip,))
-        await db.commit()
+        pool = get_pool()
+        await pool.execute(
+            "INSERT INTO monitored_hosts (ip, is_active) VALUES ($1, 1) ON CONFLICT (ip) DO UPDATE SET is_active = excluded.is_active",
+            ip,
+        )
         return True
 
     @classmethod
     async def remove_monitored_host(cls, ip: str) -> bool:
-        db = await cls.get_db()
-        cur = await db.execute("UPDATE monitored_hosts SET is_active = 0 WHERE ip = ?", (ip,))
-        await db.commit()
-        return cur.rowcount > 0
+        pool = get_pool()
+        result = await pool.execute("UPDATE monitored_hosts SET is_active = 0 WHERE ip = $1", ip)
+        return result.split()[-1] != "0"
 
     @classmethod
     async def get_monitored_hosts(cls) -> List[str]:
-        db = await cls.get_db()
-        cur = await db.execute("SELECT ip FROM monitored_hosts WHERE is_active = 1")
-        return [r["ip"] for r in await cur.fetchall()]
+        pool = get_pool()
+        rows = await pool.fetch("SELECT ip FROM monitored_hosts WHERE is_active = 1")
+        return [r["ip"] for r in rows]
 
     @classmethod
     async def bulk_insert_oui(cls, mappings: List[Tuple[str, str]]):
-        db = await cls.get_db()
-        await db.executemany(
-            "INSERT OR REPLACE INTO oui_mappings (mac_prefix, vendor) VALUES (?, ?)", 
-            mappings
+        pool = get_pool()
+        await pool.executemany(
+            "INSERT INTO oui_mappings (mac_prefix, vendor) VALUES ($1, $2) ON CONFLICT (mac_prefix) DO UPDATE SET vendor = excluded.vendor",
+            mappings,
         )
-        await db.commit()
 
     @classmethod
     async def lookup_oui(cls, mac_prefix: str) -> Optional[str]:
-        db = await cls.get_db()
-        cursor = await db.execute(
-            "SELECT vendor FROM oui_mappings WHERE mac_prefix = ?", 
-            (mac_prefix,)
-        )
-        row = await cursor.fetchone()
-        return row["vendor"] if row else None
+        pool = get_pool()
+        return await pool.fetchval("SELECT vendor FROM oui_mappings WHERE mac_prefix = $1", mac_prefix)
 
     @classmethod
     async def get_device_ports(cls, mac: str) -> List[dict]:
-        db = await cls.get_db()
-        cursor = await db.execute("SELECT port, service, is_active FROM device_ports WHERE mac = ?", (mac,))
-        return [dict(row) for row in await cursor.fetchall()]
+        pool = get_pool()
+        rows = await pool.fetch("SELECT port, service, is_active FROM device_ports WHERE mac = $1", mac)
+        return [dict(row) for row in rows]
 
     @classmethod
     async def upsert_device_ports(cls, mac: str, ports: List[dict]) -> List[dict]:
@@ -556,193 +476,185 @@ class DatabaseManager:
         ports: list of dicts with 'port' and 'service'
         Returns a list of NEW ports that appeared.
         """
-        db = await cls.get_db()
+        pool = get_pool()
         current_time = time.time()
-        
-        cursor = await db.execute("SELECT port, service, is_active FROM device_ports WHERE mac = ?", (mac,))
-        existing_ports = {row["port"]: row for row in await cursor.fetchall()}
-        
-        new_ports = []
-        upsert_data = []
-        history_inserts = []
-        
-        for p in ports:
-            port = p["port"]
-            service = p["service"]
-            upsert_data.append((mac, port, service, current_time, current_time))
-            if port not in existing_ports or existing_ports[port]["is_active"] == 0:
-                new_ports.append(p)
-                history_inserts.append((mac, port, service, "opened", current_time))
-                
-        if upsert_data:
-            await db.executemany("""
-                INSERT INTO device_ports (mac, port, service, first_seen, last_seen, is_active)
-                VALUES (?, ?, ?, ?, ?, 1)
-                ON CONFLICT(mac, port) DO UPDATE SET
-                    service = excluded.service,
-                    last_seen = excluded.last_seen,
-                    is_active = 1
-            """, upsert_data)
-            
-        current_port_nums = {p["port"] for p in ports}
-        gone_ports = [p for p in existing_ports if existing_ports[p]["is_active"] == 1 and p not in current_port_nums]
-        if gone_ports:
-            placeholders = ",".join("?" * len(gone_ports))
-            await db.execute(f"UPDATE device_ports SET is_active = 0 WHERE mac = ? AND port IN ({placeholders})", [mac] + gone_ports)
-            for gp in gone_ports:
-                history_inserts.append((mac, gp, existing_ports[gp]["service"], "closed", current_time))
-                
-        if history_inserts:
-            await db.executemany("INSERT INTO port_history (mac, port, service, event, timestamp) VALUES (?, ?, ?, ?, ?)", history_inserts)
-            
-        await db.commit()
+
+        async with pool.acquire() as db:
+            async with db.transaction():
+                existing_rows = await db.fetch("SELECT port, service, is_active FROM device_ports WHERE mac = $1", mac)
+                existing_ports = {row["port"]: row for row in existing_rows}
+
+                new_ports = []
+                upsert_data = []
+                history_inserts = []
+
+                for p in ports:
+                    port = p["port"]
+                    service = p["service"]
+                    upsert_data.append((mac, port, service, current_time, current_time))
+                    if port not in existing_ports or existing_ports[port]["is_active"] == 0:
+                        new_ports.append(p)
+                        history_inserts.append((mac, port, service, "opened", current_time))
+
+                if upsert_data:
+                    await db.executemany("""
+                        INSERT INTO device_ports (mac, port, service, first_seen, last_seen, is_active)
+                        VALUES ($1, $2, $3, $4, $5, 1)
+                        ON CONFLICT(mac, port) DO UPDATE SET
+                            service = excluded.service,
+                            last_seen = excluded.last_seen,
+                            is_active = 1
+                    """, upsert_data)
+
+                current_port_nums = {p["port"] for p in ports}
+                gone_ports = [p for p in existing_ports if existing_ports[p]["is_active"] == 1 and p not in current_port_nums]
+                if gone_ports:
+                    await db.execute(
+                        "UPDATE device_ports SET is_active = 0 WHERE mac = $1 AND port = ANY($2::integer[])", mac, gone_ports
+                    )
+                    for gp in gone_ports:
+                        history_inserts.append((mac, gp, existing_ports[gp]["service"], "closed", current_time))
+
+                if history_inserts:
+                    await db.executemany(
+                        "INSERT INTO port_history (mac, port, service, event, timestamp) VALUES ($1, $2, $3, $4, $5)",
+                        history_inserts,
+                    )
+
         return new_ports
 
     @classmethod
     async def log_event(cls, category: str, severity: str, message: str, related_id: Optional[str] = None):
         """Log an event/alert to the database for the dashboard."""
-        db = await cls.get_db()
-        await db.execute(
-            "INSERT INTO events (timestamp, category, severity, message, related_id) VALUES (?, ?, ?, ?, ?)",
-            (time.time(), category, severity, message, related_id)
+        pool = get_pool()
+        await pool.execute(
+            "INSERT INTO events (timestamp, category, severity, message, related_id) VALUES ($1, $2, $3, $4, $5)",
+            time.time(), category, severity, message, related_id,
         )
-        await db.commit()
 
     @classmethod
     async def get_devices_needing_banner_grab(cls) -> List[NetworkDevice]:
-        db = await cls.get_db()
+        pool = get_pool()
         current_time = time.time()
-        
-        query = """
+
+        rows = await pool.fetch("""
             SELECT mac, ip, vendor, hostname, banner_grab_attempted_at, banner_grab_attempts
-            FROM network_devices 
-            WHERE is_active = 1 
-            AND vendor = 'Unknown' 
+            FROM network_devices
+            WHERE is_active = 1
+            AND vendor = 'Unknown'
             AND hostname = ''
-        """
-        cursor = await db.execute(query)
-        rows = await cursor.fetchall()
-        
+        """)
+
         devices = []
         for r in rows:
             attempts = r["banner_grab_attempts"] or 0
             last_attempt = r["banner_grab_attempted_at"]
-            
+
             if last_attempt is None:
                 devices.append(NetworkDevice(mac=r["mac"], ip=r["ip"], vendor=r["vendor"], hostname=r["hostname"]))
                 continue
-                
+
             cooldown_hours = min(168, 2 ** attempts)
             if current_time - last_attempt >= cooldown_hours * 3600:
                 devices.append(NetworkDevice(mac=r["mac"], ip=r["ip"], vendor=r["vendor"], hostname=r["hostname"]))
-                
+
         return devices
 
     @classmethod
     async def record_banner_grab_attempt(cls, mac: str, resolved: bool, hostname: str = ""):
-        db = await cls.get_db()
+        pool = get_pool()
         current_time = time.time()
-        
+
         if resolved and hostname:
-            await db.execute("""
-                UPDATE network_devices 
-                SET banner_grab_attempted_at = ?, 
+            await pool.execute("""
+                UPDATE network_devices
+                SET banner_grab_attempted_at = $1,
                     banner_grab_attempts = banner_grab_attempts + 1,
-                    hostname = ?
-                WHERE mac = ?
-            """, (current_time, hostname, mac))
+                    hostname = $2
+                WHERE mac = $3
+            """, current_time, hostname, mac)
         else:
-            await db.execute("""
-                UPDATE network_devices 
-                SET banner_grab_attempted_at = ?, 
+            await pool.execute("""
+                UPDATE network_devices
+                SET banner_grab_attempted_at = $1,
                     banner_grab_attempts = banner_grab_attempts + 1
-                WHERE mac = ?
-            """, (current_time, mac))
-            
-        await db.commit()
+                WHERE mac = $2
+            """, current_time, mac)
 
     @classmethod
     async def should_alert_ble_vendor(cls, vendor_key: str, cooldown_hours: float) -> bool:
-        db = await cls.get_db()
+        pool = get_pool()
         current_time = time.time()
-        
-        cursor = await db.execute("SELECT last_alert_at FROM ble_alert_cooldown WHERE vendor_key = ?", (vendor_key,))
-        row = await cursor.fetchone()
-        
-        if row is None or (current_time - row["last_alert_at"]) >= (cooldown_hours * 3600):
-            await db.execute(
-                "INSERT INTO ble_alert_cooldown (vendor_key, last_alert_at) VALUES (?, ?) ON CONFLICT(vendor_key) DO UPDATE SET last_alert_at = excluded.last_alert_at",
-                (vendor_key, current_time)
+
+        last_alert_at = await pool.fetchval("SELECT last_alert_at FROM ble_alert_cooldown WHERE vendor_key = $1", vendor_key)
+
+        if last_alert_at is None or (current_time - last_alert_at) >= (cooldown_hours * 3600):
+            await pool.execute(
+                "INSERT INTO ble_alert_cooldown (vendor_key, last_alert_at) VALUES ($1, $2) ON CONFLICT(vendor_key) DO UPDATE SET last_alert_at = excluded.last_alert_at",
+                vendor_key, current_time,
             )
-            await db.commit()
             return True
-            
+
         return False
 
     @classmethod
     async def should_alert_honeypot(cls, src_ip: str, cooldown_seconds: float) -> bool:
-        db = await cls.get_db()
+        pool = get_pool()
         current_time = time.time()
-        
-        cursor = await db.execute("SELECT last_alert_at FROM honeypot_alert_cooldown WHERE src_ip = ?", (src_ip,))
-        row = await cursor.fetchone()
-        
-        if row is None or (current_time - row["last_alert_at"]) >= cooldown_seconds:
-            await db.execute(
-                "INSERT INTO honeypot_alert_cooldown (src_ip, last_alert_at) VALUES (?, ?) ON CONFLICT(src_ip) DO UPDATE SET last_alert_at = excluded.last_alert_at",
-                (src_ip, current_time)
+
+        last_alert_at = await pool.fetchval("SELECT last_alert_at FROM honeypot_alert_cooldown WHERE src_ip = $1", src_ip)
+
+        if last_alert_at is None or (current_time - last_alert_at) >= cooldown_seconds:
+            await pool.execute(
+                "INSERT INTO honeypot_alert_cooldown (src_ip, last_alert_at) VALUES ($1, $2) ON CONFLICT(src_ip) DO UPDATE SET last_alert_at = excluded.last_alert_at",
+                src_ip, current_time,
             )
-            await db.commit()
             return True
-            
+
         return False
 
     @classmethod
     async def should_alert_resource(cls, metric_key: str, cooldown_hours: float) -> bool:
-        db = await cls.get_db()
+        pool = get_pool()
         current_time = time.time()
-        
-        cursor = await db.execute("SELECT last_alert_at FROM resource_alert_cooldown WHERE metric_key = ?", (metric_key,))
-        row = await cursor.fetchone()
-        
-        if row is None or (current_time - row["last_alert_at"]) >= (cooldown_hours * 3600):
-            await db.execute(
-                "INSERT INTO resource_alert_cooldown (metric_key, last_alert_at) VALUES (?, ?) ON CONFLICT(metric_key) DO UPDATE SET last_alert_at = excluded.last_alert_at",
-                (metric_key, current_time)
+
+        last_alert_at = await pool.fetchval("SELECT last_alert_at FROM resource_alert_cooldown WHERE metric_key = $1", metric_key)
+
+        if last_alert_at is None or (current_time - last_alert_at) >= (cooldown_hours * 3600):
+            await pool.execute(
+                "INSERT INTO resource_alert_cooldown (metric_key, last_alert_at) VALUES ($1, $2) ON CONFLICT(metric_key) DO UPDATE SET last_alert_at = excluded.last_alert_at",
+                metric_key, current_time,
             )
-            await db.commit()
             return True
-            
+
         return False
 
     @classmethod
     async def queue_deferred_scan(cls, mac: str, ip: str):
-        import time
-        db = await cls.get_db()
-        await db.execute("INSERT OR REPLACE INTO deferred_scans (mac, ip, queued_at) VALUES (?, ?, ?)", (mac, ip, time.time()))
-        await db.commit()
+        pool = get_pool()
+        await pool.execute(
+            "INSERT INTO deferred_scans (mac, ip, queued_at) VALUES ($1, $2, $3) ON CONFLICT (mac) DO UPDATE SET ip = excluded.ip, queued_at = excluded.queued_at",
+            mac, ip, time.time(),
+        )
 
     @classmethod
     async def get_due_deferred_scans(cls) -> List[Tuple[str, str]]:
-        db = await cls.get_db()
-        cursor = await db.execute("SELECT mac, ip FROM deferred_scans")
-        rows = await cursor.fetchall()
+        pool = get_pool()
+        rows = await pool.fetch("SELECT mac, ip FROM deferred_scans")
         return [(r["mac"], r["ip"]) for r in rows]
 
     @classmethod
     async def remove_deferred_scan(cls, mac: str):
-        db = await cls.get_db()
-        await db.execute("DELETE FROM deferred_scans WHERE mac = ?", (mac,))
-        await db.commit()
+        pool = get_pool()
+        await pool.execute("DELETE FROM deferred_scans WHERE mac = $1", mac)
 
     @classmethod
     async def log_latency_sample(cls, target: str, loss_pct: float, jitter_ms: float):
-        db = await cls.get_db()
-        await db.execute(
-            "INSERT INTO latency_samples (timestamp, target, loss_pct, jitter_ms) VALUES (?, ?, ?, ?)",
-            (time.time(), target, loss_pct, jitter_ms)
+        pool = get_pool()
+        await pool.execute(
+            "INSERT INTO latency_samples (timestamp, target, loss_pct, jitter_ms) VALUES ($1, $2, $3, $4)",
+            time.time(), target, loss_pct, jitter_ms,
         )
-        await db.commit()
 
     @classmethod
     async def cache_oui_entry(cls, prefix: str, vendor: str):
@@ -750,63 +662,55 @@ class DatabaseManager:
 
     @classmethod
     async def update_device_vendor(cls, mac: str, vendor: str):
-        db = await cls.get_db()
-        await db.execute("UPDATE network_devices SET vendor = ? WHERE mac = ?", (vendor, mac))
-        await db.commit()
+        pool = get_pool()
+        await pool.execute("UPDATE network_devices SET vendor = $1 WHERE mac = $2", vendor, mac)
 
     @classmethod
     async def record_scan_heartbeat(cls, job_name: str):
-        import time
-        db = await cls.get_db()
-        await db.execute(
-            "INSERT INTO job_heartbeats (job_name, last_run_at) VALUES (?, ?) ON CONFLICT(job_name) DO UPDATE SET last_run_at=excluded.last_run_at",
-            (job_name, time.time())
+        pool = get_pool()
+        await pool.execute(
+            "INSERT INTO job_heartbeats (job_name, last_run_at) VALUES ($1, $2) ON CONFLICT(job_name) DO UPDATE SET last_run_at=excluded.last_run_at",
+            job_name, time.time(),
         )
-        await db.commit()
 
     @classmethod
     async def insert_dns_queries(cls, queries: List[Tuple[float, str, str, str]]):
         """Batch insert DNS queries (timestamp, src_ip, query_name, query_type)."""
-        db = await cls.get_db()
-        await db.executemany(
-            "INSERT INTO dns_queries (timestamp, src_ip, query_name, query_type) VALUES (?, ?, ?, ?)",
-            queries
+        pool = get_pool()
+        await pool.executemany(
+            "INSERT INTO dns_queries (timestamp, src_ip, query_name, query_type) VALUES ($1, $2, $3, $4)",
+            queries,
         )
-        await db.commit()
 
     @classmethod
     async def get_recent_dns_queries(cls, ip: str, limit: int = 50) -> List[dict]:
-        db = await cls.get_db()
-        cursor = await db.execute("""
+        pool = get_pool()
+        rows = await pool.fetch("""
             SELECT query_name, MAX(timestamp) as last_seen, query_type
             FROM dns_queries
-            WHERE src_ip = ?
-            GROUP BY query_name
+            WHERE src_ip = $1
+            GROUP BY query_name, query_type
             ORDER BY last_seen DESC
-            LIMIT ?
-        """, (ip, limit))
-        return [dict(row) for row in await cursor.fetchall()]
+            LIMIT $2
+        """, ip, limit)
+        return [dict(row) for row in rows]
 
     @classmethod
     async def set_maintenance(cls, mac: str, hours: float, reason: str = ""):
-        import time
-        db = await cls.get_db()
+        pool = get_pool()
         if hours <= 0:
-            await db.execute("DELETE FROM device_maintenance WHERE mac = ?", (mac,))
+            await pool.execute("DELETE FROM device_maintenance WHERE mac = $1", mac)
         else:
             until = time.time() + (hours * 3600)
-            await db.execute(
-                "INSERT INTO device_maintenance (mac, until_timestamp, reason) VALUES (?, ?, ?) ON CONFLICT(mac) DO UPDATE SET until_timestamp = excluded.until_timestamp, reason = excluded.reason",
-                (mac, until, reason)
+            await pool.execute(
+                "INSERT INTO device_maintenance (mac, until_timestamp, reason) VALUES ($1, $2, $3) ON CONFLICT(mac) DO UPDATE SET until_timestamp = excluded.until_timestamp, reason = excluded.reason",
+                mac, until, reason,
             )
-        await db.commit()
 
     @classmethod
     async def is_in_maintenance(cls, mac: str) -> bool:
-        import time
-        db = await cls.get_db()
-        cursor = await db.execute("SELECT until_timestamp FROM device_maintenance WHERE mac = ?", (mac,))
-        row = await cursor.fetchone()
-        if row and row["until_timestamp"] > time.time():
+        pool = get_pool()
+        until_timestamp = await pool.fetchval("SELECT until_timestamp FROM device_maintenance WHERE mac = $1", mac)
+        if until_timestamp and until_timestamp > time.time():
             return True
         return False

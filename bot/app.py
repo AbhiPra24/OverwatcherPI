@@ -23,7 +23,7 @@ def setup_application(post_init_hook=None):
     async def internal_post_init(app):
         if post_init_hook:
             await post_init_hook(app)
-            
+
         from telegram import BotCommand
         await app.bot.set_my_commands([
             BotCommand("status", "Hardware diagnostics"),

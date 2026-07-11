@@ -37,7 +37,7 @@ flowchart TD
             CADDY["🔒 Caddy Reverse Proxy\n:8109 → localhost:8501\nBasic Auth"]
         end
 
-        DB[("🗄️ SQLite DB\nnetmon.db\n─────────────\nnetwork_devices\nbt_devices\nevents\ndevice_ports\nport_history\nlatency_samples\nscan_history\njob_heartbeats\ndeferred_scans")]
+        DB[("🗄️ Supabase\n(hosted Postgres)\n─────────────\nnetwork_devices\nbt_devices\nevents\ndevice_ports\nport_history\nlatency_samples\nscan_history\njob_heartbeats\ndeferred_scans\n+ 8 more tables")]
     end
 
     subgraph EXTERNAL["☁️ External"]
@@ -63,7 +63,7 @@ flowchart TD
     TGBOT --> SCHED
 
     %% DB → Dashboard
-    DB -->|"read-only bind mount"| STREAMLIT
+    DB -->|"psycopg2 pool\n(network)"| STREAMLIT
 
     %% Dashboard → Caddy → User
     STREAMLIT -->|"localhost:8501"| CADDY
@@ -121,7 +121,8 @@ flowchart TD
 - **Job Heartbeats** — every scheduled job records its last run time; used as Docker healthcheck source
 
 ### 🛠️ Reliability & Maintainability
-- **Automated DB Backups** — SQLite `.backup` API safely dumps the live database every night
+- **Hosted Postgres (Supabase)** — all state lives in a hosted Supabase Postgres instance, reachable and alterable from anywhere, not just the Pi
+- **Automated DB Backups** — nightly per-table gzip CSV export via `asyncpg`'s `COPY`, with configurable retention
 - **Config Drift Detection** — Hashes your active configuration and alerts you if manual edits drift from the baseline
 - **Dead-Man's Switch** — Telegram heartbeat tracking and fallback file logging ensures you never fail silently
 - **Command Abuse Guard** — In-memory rate limits protect the hardware scanners from API or bot flood attacks
@@ -185,12 +186,11 @@ docker compose up -d
 docker compose logs -f   # watch startup
 ```
 
-All 4 services will come up:
+All 3 services will come up:
 
 | Service | Network | Port |
 |---------|---------|------|
 | `overwatcher-bot` | `host` | — |
-| `overwatcher-sniffer` | `host` | — |
 | `overwatcher-dashboard` | default bridge | `127.0.0.1:8501` (local only) |
 | `overwatcher-caddy` | `host` | **8109** (public) |
 
@@ -248,6 +248,7 @@ See [`docs/docker.md`](docs/docker.md) for the full migration guide, healthcheck
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `DATABASE_URL` | *(required)* | Supabase Postgres connection string (Session Pooler, port 5432) |
 | `TELEGRAM_BOT_TOKEN` | *(required)* | Bot token from @BotFather |
 | `TELEGRAM_OWNER_IDS` | *(required)* | Comma-separated Telegram user IDs |
 | `SCAN_SUBNET` | `192.168.1.0/24` | Subnet to sweep |

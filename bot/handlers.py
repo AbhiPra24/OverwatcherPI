@@ -13,7 +13,6 @@ from core.database import DatabaseManager
 from config import config
 from core.job_queue import JobQueue
 from core.scan_limits import SCAN_LOCK
-from scanners import network, bluetooth
 import time
 
 def check_cooldown(context: ContextTypes.DEFAULT_TYPE, command_name: str, cooldown_s: int = 30) -> float:
@@ -126,6 +125,7 @@ async def speedtest_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # timeout). Instead: load all servers, sort by distance, probe the
         # 5 closest, and pick the one with the lowest real latency.
         st.get_servers()
+        st.get_best_server(st.get_servers())
         server = st.get_best_server()
         ping = server.get("latency", 0)
         # Sanity check: if latency is absurdly high (>5000 ms), the server
@@ -286,8 +286,7 @@ async def dns_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     if re.match(r"^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$", target.upper()):
         db = await DatabaseManager.get_db()
-        cursor = await db.execute("SELECT ip FROM network_devices WHERE mac = ?", (target.upper(),))
-        row = await cursor.fetchone()
+        row = await db.fetchrow("SELECT ip FROM network_devices WHERE mac = $1", target.upper())
         if row and row["ip"]:
             target = row["ip"]
         else:
@@ -375,9 +374,8 @@ async def export_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("📦 <i>Generating export...</i>", parse_mode=ParseMode.HTML)
     try:
         db = await DatabaseManager.get_db()
-        cursor = await db.execute("SELECT * FROM network_devices")
-        rows = await cursor.fetchall()
-        
+        rows = await db.fetch("SELECT * FROM network_devices")
+
         fd, path = tempfile.mkstemp(suffix=".csv")
         os.close(fd)
         
@@ -439,8 +437,7 @@ async def logs_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @auth_required
 async def jobs_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db = await DatabaseManager.get_db()
-    cur = await db.execute("SELECT id, job_type, target, status FROM jobs ORDER BY created_at DESC LIMIT 10")
-    rows = await cur.fetchall()
+    rows = await db.fetch("SELECT id, job_type, target, status FROM jobs ORDER BY created_at DESC LIMIT 10")
     if not rows:
         await update.message.reply_text("No recent jobs.")
         return
@@ -457,8 +454,7 @@ async def job_detail_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     job_id = context.args[0]
     db = await DatabaseManager.get_db()
-    cur = await db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
-    row = await cur.fetchone()
+    row = await db.fetchrow("SELECT * FROM jobs WHERE id = $1", job_id)
     if not row:
         await update.message.reply_text(f"Job {job_id} not found.")
         return
@@ -483,12 +479,12 @@ async def health_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     import os
     import time
     msg = []
-    
-    db_path = config.db_path
-    if os.path.exists(db_path):
-        db_size_mb = os.path.getsize(db_path) / (1024 * 1024)
-        msg.append(f"📦 <b>DB Size:</b> {db_size_mb:.2f} MB")
-    
+
+    db = await DatabaseManager.get_db()
+    db_size_pretty = await db.fetchval("SELECT pg_size_pretty(pg_database_size(current_database()))")
+    if db_size_pretty:
+        msg.append(f"📦 <b>DB Size (Supabase):</b> {db_size_pretty}")
+
     stat = os.statvfs('/')
     free_space_gb = (stat.f_bavail * stat.f_frsize) / (1024**3)
     total_space_gb = (stat.f_blocks * stat.f_frsize) / (1024**3)
@@ -500,9 +496,7 @@ async def health_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
         
-    db = await DatabaseManager.get_db()
-    cur = await db.execute("SELECT job_name, last_run_at FROM job_heartbeats")
-    rows = await cur.fetchall()
+    rows = await db.fetch("SELECT job_name, last_run_at FROM job_heartbeats")
     if rows:
         msg.append("\n⏱️ <b>Heartbeats:</b>")
         now = time.time()

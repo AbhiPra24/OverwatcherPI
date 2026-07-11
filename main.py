@@ -5,6 +5,7 @@ from telegram.ext import Application
 
 from config import config
 from core.database import DatabaseManager
+from core.db import init_pool
 from core import oui
 from core.scheduler import setup_scheduler
 from bot.app import setup_application
@@ -18,18 +19,17 @@ def setup_logging():
 
 async def _post_init(app: Application) -> None:
     """PTB post_init hook. Runs within the event loop before polling starts."""
-    logging.getLogger(__name__).info("ENTERING _post_init")
-    # 1. Initialize SQLite connection and schemas
-    await DatabaseManager.get_db()
-    logging.getLogger(__name__).info("Database tables initialized (from _post_init).")
-    
+    # 1. Initialize Supabase connection pool and schemas
+    await init_pool()
+    await DatabaseManager.init_db()
+
     # 2. Ensure OUI database is cached
     await oui.load_or_refresh()
-    
+
     # 2b. Ensure DNS blocklist is cached
     from core import threat_intel
     await threat_intel.load_or_refresh()
-    
+
     # 3. Start APScheduler within this event loop
     scheduler = setup_scheduler(app)
     scheduler.start()
@@ -71,10 +71,7 @@ async def run_bot():
     logger = logging.getLogger(__name__)
     
     logger.info("Initializing OverwatcherPI Daemon...")
-    app = setup_application(post_init_hook=None)
-    
-    logger.info("Manually invoking _post_init...")
-    await _post_init(app)
+    app = setup_application(post_init_hook=_post_init)
     
     stop_event = asyncio.Event()
     
@@ -88,6 +85,12 @@ async def run_bot():
         
     try:
         async with app:
+            # PTB's Application.initialize() (called by __aenter__) intentionally does
+            # NOT invoke post_init — that's normally done by run_polling()/run_webhook().
+            # Since we drive start()/updater.start_polling() manually below, we must
+            # call it ourselves or none of the scheduler/OUI/DNS/API-server setup runs.
+            if app.post_init:
+                await app.post_init(app)
             logger.info("Starting Telegram Bot polling...")
             await app.start()
             await app.updater.start_polling(drop_pending_updates=True)

@@ -24,38 +24,11 @@ services:
       - /dev/vcio:/dev/vcio  # required by vcgencmd
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c",
-        "import sqlite3, time, sys; \
-         conn = sqlite3.connect('/app/data/netmon.db'); \
-         rows = conn.execute(\"SELECT last_run_at FROM job_heartbeats WHERE job_name IN ('fast_sweep', 'service_watchdog', 'resource_health')\").fetchall(); \
-         sys.exit(0 if len(rows) == 3 and all((time.time()-r[0]) < 900 for r in rows) else 1)"]
+      test: ["CMD", "python", "healthcheck.py"]
       interval: 5m
-      timeout: 10s
+      timeout: 20s
       retries: 3
       start_period: 2m
-
-  sniffer:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: overwatcher-sniffer
-    user: root
-    command: python bin/sniffer_daemon.py
-    network_mode: host          # required: must see real LAN ARP/DHCP traffic
-    cap_add:
-      - NET_RAW
-      - NET_ADMIN
-    env_file: .env
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
-      interval: 1m
-      timeout: 5s
-      retries: 3
-      start_period: 30s
 
   dashboard:
     build:
