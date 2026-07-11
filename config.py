@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     ble_proximity_immediate_dbm: int = -50
     ble_proximity_near_dbm: int = -70
     sweep_interval_minutes: int = 5
+    device_offline_grace_minutes: int = 45
     speedtest_interval_hours: int = 3
     cpu_warn_percent: float = 85.0
     ram_warn_percent: float = 85.0

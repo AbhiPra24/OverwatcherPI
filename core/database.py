@@ -314,19 +314,28 @@ class DatabaseManager:
                 raw_netbios_name = CASE WHEN excluded.raw_netbios_name IS NOT NULL THEN excluded.raw_netbios_name ELSE network_devices.raw_netbios_name END
         """, [(d.mac, d.ip, d.vendor, d.hostname, current_time, current_time, d.raw_mdns_name, d.raw_ssdp_server, d.raw_netbios_name) for d in devices])
         
-        # Mark missing devices as inactive
+        # Mark missing devices as inactive, but only after a grace period of missed
+        # scans — battery/power-save devices (phones, watches, IoT plugs) routinely
+        # skip a single ARP reply without actually leaving the network.
+        grace_cutoff = current_time - (config.device_offline_grace_minutes * 60)
         if current_macs:
             placeholders = ",".join("?" * len(current_macs))
-            query = f"SELECT mac FROM network_devices WHERE is_active = 1 AND mac NOT IN ({placeholders})"
-            cursor = await db.execute(query, list(current_macs))
+            query = f"""
+                SELECT mac FROM network_devices
+                WHERE is_active = 1 AND mac NOT IN ({placeholders}) AND last_seen < ?
+            """
+            cursor = await db.execute(query, list(current_macs) + [grace_cutoff])
             gone_macs = {row["mac"] for row in await cursor.fetchall()}
-            
-            await db.execute(f"UPDATE network_devices SET is_active = 0 WHERE mac NOT IN ({placeholders})", list(current_macs))
+
+            await db.execute(
+                f"UPDATE network_devices SET is_active = 0 WHERE mac NOT IN ({placeholders}) AND last_seen < ?",
+                list(current_macs) + [grace_cutoff]
+            )
         else:
-            # Everything is gone
-            cursor = await db.execute("SELECT mac FROM network_devices WHERE is_active = 1")
+            # Everything is gone (empty scan) — still respect the grace period.
+            cursor = await db.execute("SELECT mac FROM network_devices WHERE is_active = 1 AND last_seen < ?", (grace_cutoff,))
             gone_macs = {row["mac"] for row in await cursor.fetchall()}
-            await db.execute("UPDATE network_devices SET is_active = 0")
+            await db.execute("UPDATE network_devices SET is_active = 0 WHERE last_seen < ?", (grace_cutoff,))
 
         # Record scan history
         await db.execute(
