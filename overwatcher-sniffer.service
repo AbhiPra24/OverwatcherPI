@@ -5,9 +5,9 @@ After=network.target
 [Service]
 Type=simple
 User=abhipra
-WorkingDirectory=/home/abhipra/Work/OverwatcherPI
-Environment="PATH=/home/abhipra/Work/OverwatcherPI/venv/bin:/usr/bin"
-ExecStart=/home/abhipra/Work/OverwatcherPI/venv/bin/python bin/sniffer_daemon.py
+WorkingDirectory=/mnt/usb-storage/Work/OverwatcherPI
+Environment="PATH=/mnt/usb-storage/Work/OverwatcherPI/venv/bin:/usr/bin"
+ExecStart=/mnt/usb-storage/Work/OverwatcherPI/venv/bin/python bin/sniffer_daemon.py
 AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
 Restart=always
 RestartSec=10

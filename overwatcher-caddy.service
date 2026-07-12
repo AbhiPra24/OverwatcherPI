@@ -5,8 +5,8 @@ After=network.target overwatcher-dashboard.service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/home/abhipra/Work/OverwatcherPI/dashboard
-ExecStart=/usr/bin/caddy run --config /home/abhipra/Work/OverwatcherPI/dashboard/Caddyfile
+WorkingDirectory=/mnt/usb-storage/Work/OverwatcherPI/dashboard
+ExecStart=/usr/bin/caddy run --config /mnt/usb-storage/Work/OverwatcherPI/dashboard/Caddyfile
 Restart=always
 RestartSec=5
 
