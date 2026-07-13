@@ -1,6 +1,6 @@
 streamlit>=1.37
 pandas
-psycopg2-binary==2.9.10
+psycopg2-binary==2.9.12
 psutil
 pydantic
 pydantic-settings
