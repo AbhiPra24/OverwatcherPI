@@ -24,7 +24,7 @@ dependencies = [
     "scapy==2.7.0",
     "zeroconf==0.150.0",
     "fastapi==0.139.0",
-    "uvicorn==0.50.2",
+    "uvicorn==0.51.0",
     "speedtest-cli==2.1.3"
 ]
 
