@@ -66,14 +66,7 @@ def get_throttling_status() -> str:
                 issues.append("Currently throttled")
             if val & 0x8:
                 issues.append("Soft temperature limit active")
-            if val & 0x10000:
-                issues.append("Under-voltage occurred")
-            if val & 0x20000:
-                issues.append("ARM freq capped occurred")
-            if val & 0x40000:
-                issues.append("Throttling occurred")
-            if val & 0x80000:
-                issues.append("Soft temp limit occurred")
+
                 
             if issues:
                 return "⚠️ " + ", ".join(issues)

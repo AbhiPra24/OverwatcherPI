@@ -1,17 +1,25 @@
-.git
-.env
-__pycache__
-*.pyc
-*.pyo
-.pytest_cache
+# Ignore python virtual environments
+testenv/
 venv/
-dashboard/venv/
-logs/
+.venv/
+__pycache__/
+*.pyc
+
+# Ignore data and databases
 data/
+*.db
+*.sqlite3
+*.csv
+*.gz
+
+# Ignore logs
+logs/
 *.log
-*.pid
-.env.bak
-data.bak/
-logs.bak/
-build/
-*.egg-info/
+
+# Ignore Git files
+.git/
+.github/
+.gitignore
+
+# Ignore local configs
+.env
