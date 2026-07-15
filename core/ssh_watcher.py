@@ -6,7 +6,6 @@ from collections import defaultdict
 from telegram.ext import Application
 from telegram.constants import ParseMode
 
-from config import config
 from core.database import DatabaseManager
 from utils.osint import get_ip_info
 from bot.broadcaster import broadcast_message
@@ -16,9 +15,9 @@ logger = logging.getLogger(__name__)
 async def ssh_log_watcher(app: Application):
     log_file = "/var/log/auth.log"
     
-    # Check if we can read it
     try:
-        with open(log_file, "r"): pass
+        with open(log_file, "r"):
+            pass
     except Exception as e:
         logger.error(f"SSH watcher cannot read {log_file}: {e}")
         try:

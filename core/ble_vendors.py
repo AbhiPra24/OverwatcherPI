@@ -1,4 +1,4 @@
-import struct
+import hashlib
 from typing import Optional, Dict, List
 
 COMPANY_IDS = {
@@ -48,8 +48,6 @@ def get_ble_vendor(manufacturer_data: Dict[int, bytes], service_uuids: List[str]
                 return f"Unknown ({SERVICE_UUIDS[uuid_lower]} device)"
                 
     return vendor
-
-import hashlib
 
 def compute_fingerprint(manufacturer_data: Dict[int, bytes], service_uuids: List[str], tx_power: Optional[int]) -> str:
     """

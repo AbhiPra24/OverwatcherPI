@@ -66,7 +66,14 @@ def get_throttling_status() -> str:
                 issues.append("Currently throttled")
             if val & 0x8:
                 issues.append("Soft temperature limit active")
-
+            if val & 0x10000:
+                issues.append("Under-voltage occurred")
+            if val & 0x20000:
+                issues.append("ARM frequency capping occurred")
+            if val & 0x40000:
+                issues.append("Throttling occurred")
+            if val & 0x80000:
+                issues.append("Soft temperature limit occurred")
                 
             if issues:
                 return "⚠️ " + ", ".join(issues)
@@ -83,7 +90,47 @@ def get_throttling_status() -> str:
     return "Unknown"
 
 
+def get_docker_container_status(container_name: str) -> str:
+    import socket
+    import json
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(1.0)
+        s.connect("/var/run/docker.sock")
+        request = f"GET /containers/{container_name}/json HTTP/1.0\r\n\r\n"
+        s.sendall(request.encode())
+        response = b""
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            response += chunk
+        s.close()
+        
+        header, body = response.split(b"\r\n\r\n", 1)
+        if b"200 OK" in header:
+            data = json.loads(body.decode())
+            state = data.get("State", {})
+            if state.get("Running"):
+                health = state.get("Health", {})
+                if health:
+                    status = health.get("Status")
+                    if status == "healthy":
+                        return "active"
+                    return status or "failed"
+                return "active"
+            return state.get("Status", "inactive")
+    except Exception:
+        pass
+    return "unknown"
+
+
 def get_service_status(service_name: str) -> str:
+    if Path("/var/run/docker.sock").exists():
+        status = get_docker_container_status(service_name)
+        if status != "unknown":
+            return status
+
     try:
         output = subprocess.check_output(
             ["systemctl", "is-active", service_name],

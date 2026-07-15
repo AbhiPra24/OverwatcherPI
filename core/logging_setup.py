@@ -1,6 +1,5 @@
 import logging
 import json
-import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 

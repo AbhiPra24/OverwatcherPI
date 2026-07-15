@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from dashboard import db
 import time
 st.session_state["alerts_last_viewed"] = time.time()

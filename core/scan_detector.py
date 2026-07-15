@@ -6,7 +6,6 @@ from typing import Dict, Set
 from telegram.ext import Application
 from telegram.constants import ParseMode
 
-from config import config
 from core.database import DatabaseManager
 from bot.broadcaster import broadcast_message
 
@@ -69,5 +68,4 @@ class ScanDetector:
                     logger.error(f"Failed to send scan alert: {e}")
                     
         # Fire and forget
-        import asyncio
         asyncio.run_coroutine_threadsafe(_alert(), self.loop)

@@ -122,8 +122,10 @@ st.markdown("### Port History")
 port_history_df = db.get_device_port_history(mac)
 if not port_history_df.empty:
     def color_event(val):
-        if val == 'opened': return 'color: red'
-        if val == 'closed': return 'color: green'
+        if val == 'opened':
+            return 'color: red'
+        if val == 'closed':
+            return 'color: green'
         return 'color: inherit'
         
     st.dataframe(port_history_df[['datetime', 'port', 'service', 'event']].style.map(color_event, subset=['event']), width="stretch", hide_index=True)
@@ -134,9 +136,12 @@ st.markdown("### Event History")
 events_df = db.get_device_events(mac)
 if not events_df.empty:
     def color_severity(val):
-        if val in ['high', 'critical']: return 'color: red'
-        if val == 'warning': return 'color: orange'
-        if val == 'info': return 'color: green'
+        if val in ['high', 'critical']:
+            return 'color: red'
+        if val == 'warning':
+            return 'color: orange'
+        if val == 'info':
+            return 'color: green'
         return 'color: inherit'
         
     st.dataframe(events_df[['datetime', 'category', 'severity', 'message']].style.map(color_severity, subset=['severity']), width="stretch", hide_index=True)

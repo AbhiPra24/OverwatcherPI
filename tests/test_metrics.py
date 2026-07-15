@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import patch
 from utils.metrics import get_throttling_status
 

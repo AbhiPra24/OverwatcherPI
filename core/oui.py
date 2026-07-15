@@ -1,7 +1,7 @@
 import asyncio
 import csv
 import logging
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 import aiohttp
 from core.database import DatabaseManager
 

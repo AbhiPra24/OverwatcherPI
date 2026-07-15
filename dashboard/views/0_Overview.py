@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from dashboard import db
 from utils import metrics
 from datetime import datetime

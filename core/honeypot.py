@@ -37,7 +37,7 @@ async def handle_honeypot_connection(reader: asyncio.StreamReader, writer: async
 async def start_honeypots(app: Application):
     for port in config.honeypot_ports:
         try:
-            server = await asyncio.start_server(
+            await asyncio.start_server(
                 lambda r, w, p=port: handle_honeypot_connection(r, w, app, p),
                 "0.0.0.0", 
                 port

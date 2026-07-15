@@ -1,18 +1,15 @@
 import logging
 from typing import List
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Header
 import uvicorn
-import asyncio
 from pydantic import BaseModel
 
 from config import config
-from core.database import DatabaseManager, NetworkDevice
+from core.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="OverwatcherPI API", version="1.0.0")
-
-from fastapi import Depends, Header
 
 async def verify_token(x_api_token: str = Header(...)):
     if x_api_token != config.api_token:

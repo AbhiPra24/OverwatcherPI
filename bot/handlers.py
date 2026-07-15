@@ -1,19 +1,23 @@
+import asyncio
+import csv
+import os
+import re
+import tempfile
+import time
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
-import asyncio
 import speedtest
-import re
 
 from bot.middleware import auth_required
 from bot import formatters
 from utils import metrics
 from utils.osint import get_ip_info
 from core.database import DatabaseManager
-from config import config
 from core.job_queue import JobQueue
 from core.scan_limits import SCAN_LOCK
-import time
+from scanners import network, bluetooth
 
 def check_cooldown(context: ContextTypes.DEFAULT_TYPE, command_name: str, cooldown_s: int = 30) -> float:
     now = time.time()
@@ -365,10 +369,6 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
         info = await get_ip_info(ip)
         await msg.edit_text(f"🌐 <b>OSINT for <code>{ip}</code>:</b>\n<pre>{formatters.escape(info)}</pre>", parse_mode=ParseMode.HTML)
 
-import tempfile
-import os
-import csv
-
 @auth_required
 async def export_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("📦 <i>Generating export...</i>", parse_mode=ParseMode.HTML)
@@ -401,7 +401,7 @@ async def logs_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args and context.args[0].isdigit():
         lines = context.args[0]
         
-    msg = await update.message.reply_text(f"📋 <i>Fetching logs...</i>", parse_mode=ParseMode.HTML)
+    msg = await update.message.reply_text("📋 <i>Fetching logs...</i>", parse_mode=ParseMode.HTML)
     try:
         proc = await asyncio.create_subprocess_exec(
             "tail", "-n", lines, "logs/overwatcher.log",
@@ -419,7 +419,7 @@ async def logs_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not output.strip():
             output = stderr.decode('utf-8', errors='ignore')
         if not output.strip():
-            await msg.edit_text(f"<i>No logs found.</i>", parse_mode=ParseMode.HTML)
+            await msg.edit_text("<i>No logs found.</i>", parse_mode=ParseMode.HTML)
             return
             
         if len(output) > 3800:

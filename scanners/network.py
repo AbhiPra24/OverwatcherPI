@@ -87,7 +87,7 @@ def _get_mdns_names() -> dict:
         ]
         all_types = list(set(dynamic_types + fixed_types))
         
-        browser = ServiceBrowser(zc, all_types, Listener())
+        _browser = ServiceBrowser(zc, all_types, Listener())
         import time
         time.sleep(2)
         zc.close()

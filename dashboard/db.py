@@ -133,7 +133,7 @@ def get_job_heartbeats() -> pd.DataFrame:
     with get_connection() as conn:
         try:
             return pd.read_sql_query("SELECT * FROM job_heartbeats", conn)
-        except Exception as e:
+        except Exception:
             return pd.DataFrame(columns=["job_name", "last_run_at"])
 
 @st.cache_data(ttl=30)

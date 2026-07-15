@@ -29,7 +29,7 @@ def threat_map_view():
     def resolve_domain(domain):
         try:
             return socket.gethostbyname(domain)
-        except:
+        except Exception:
             return None
 
     domain_to_ip = {}
@@ -41,13 +41,14 @@ def threat_map_view():
                 ip = future.result()
                 if ip:
                     domain_to_ip[domain] = ip
-            except:
+            except Exception:
                 pass
                 
     df['resolved_ip'] = df['query_name'].map(domain_to_ip)
     
     def is_external(ip):
-        if not isinstance(ip, str): return False
+        if not isinstance(ip, str):
+            return False
         return not (ip.startswith("192.168.") or ip.startswith("10.") or ip.startswith("172."))
         
     external_df = df[df['resolved_ip'].apply(is_external)].copy()

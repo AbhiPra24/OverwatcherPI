@@ -2,11 +2,11 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.logging_setup import configure_logging
-configure_logging("dashboard")
-
 import streamlit as st
 from auth import check_password
+from core.logging_setup import configure_logging
+
+configure_logging("dashboard")
 
 st.set_page_config(page_title="OverwatcherPI Dashboard", layout="wide")
 
@@ -17,7 +17,6 @@ if not check_password():
 with st.sidebar:
     st.text_input("🔍 Global Search", key="global_search", placeholder="IP, MAC, Vendor, or Event...")
     
-    import time
     from dashboard.db import get_connection
     last_viewed = st.session_state.get("alerts_last_viewed", 0)
     

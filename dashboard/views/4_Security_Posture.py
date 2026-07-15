@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from dashboard import db
 from core import threat_intel
 
@@ -65,9 +64,12 @@ def render_posture():
         
         if not scan_events_df.empty:
             def color_severity(val):
-                if val in ['high', 'critical']: return 'color: red'
-                if val == 'warning': return 'color: orange'
-                if val == 'info': return 'color: green'
+                if val in ['high', 'critical']:
+                    return 'color: red'
+                if val == 'warning':
+                    return 'color: orange'
+                if val == 'info':
+                    return 'color: green'
                 return 'color: inherit'
                 
             styled_df = scan_events_df[['datetime', 'category', 'severity', 'message', 'related_id']].style.map(color_severity, subset=['severity'])

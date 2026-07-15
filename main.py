@@ -109,7 +109,7 @@ async def run_bot():
                     
 
                     
-    except Exception as e:
+    except Exception:
         logger.exception("Critical error in main loop")
     finally:
         await DatabaseManager.close()

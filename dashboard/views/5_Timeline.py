@@ -53,9 +53,12 @@ def timeline_view():
     timeline_df = timeline_df.sort_values(by='timestamp', ascending=False).drop(columns=['timestamp'])
     
     def color_type(val):
-        if val == 'Event': return 'background-color: rgba(255, 100, 100, 0.2)'
-        if val == 'Port Activity': return 'background-color: rgba(255, 200, 100, 0.2)'
-        if val == 'Scan': return 'background-color: rgba(100, 200, 255, 0.2)'
+        if val == 'Event':
+            return 'background-color: rgba(255, 100, 100, 0.2)'
+        if val == 'Port Activity':
+            return 'background-color: rgba(255, 200, 100, 0.2)'
+        if val == 'Scan':
+            return 'background-color: rgba(100, 200, 255, 0.2)'
         return ''
         
     st.dataframe(timeline_df[['datetime', 'type', 'description']].style.map(color_type, subset=['type']), width="stretch", hide_index=True)
