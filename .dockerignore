@@ -2,7 +2,10 @@
 testenv/
 venv/
 .venv/
-__pycache__/
+**/venv/
+**/.venv/
+**/testenv/
+**/__pycache__/
 *.pyc
 
 # Ignore data and databases

@@ -70,6 +70,7 @@ def get_throttling_status() -> str:
                 
             if issues:
                 return "⚠️ " + ", ".join(issues)
+            return "✅ Normal"
     except FileNotFoundError:
         return "Not available (vcgencmd missing)"
     except subprocess.CalledProcessError as e:
