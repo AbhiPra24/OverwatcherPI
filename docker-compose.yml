@@ -13,6 +13,8 @@ services:
     cap_add:
       - NET_RAW
       - NET_ADMIN
+    group_add:
+      - "986"
     env_file: .env
     volumes:
       - ./data:/app/data
@@ -20,6 +22,7 @@ services:
       - /var/run/dbus:/var/run/dbus  # BlueZ D-Bus passthrough (see docs/docker.md)
       - /usr/bin/vcgencmd:/usr/bin/vcgencmd:ro  # Pi throttling/temp queries
       - /var/log/auth.log:/var/log/auth.log:ro  # SSH watcher
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # docker socket for container health checks
     devices:
       - /dev/vcio:/dev/vcio  # required by vcgencmd
     restart: unless-stopped
