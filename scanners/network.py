@@ -58,7 +58,7 @@ async def _resolve_hostname(ip: str) -> str:
 
 
 def _get_mdns_names() -> dict:
-    """Run a brief mDNS scan and return IP -> name mapping."""
+    """Run a brief mDNS scan and return IP -> name mapping, with model extraction."""
     ip_names = {}
     
     class Listener:
@@ -70,7 +70,25 @@ def _get_mdns_names() -> dict:
                 if info and info.parsed_addresses():
                     ip = info.parsed_addresses()[0]
                     clean_name = name.split('.')[0]
-                    ip_names[ip] = clean_name
+                    
+                    # Try to parse model info from TXT properties
+                    model_str = None
+                    if info.properties:
+                        props = {}
+                        for k, v in info.properties.items():
+                            k_str = k.decode("utf-8", "ignore") if isinstance(k, bytes) else str(k)
+                            v_str = v.decode("utf-8", "ignore") if isinstance(v, bytes) else str(v)
+                            props[k_str.lower()] = v_str
+                            
+                        # Common model keys in AirPlay, HomeKit, CompanionLink, Chromecast
+                        model_str = props.get("model") or props.get("md") or props.get("am")
+                        
+                    if model_str and clean_name and model_str.lower() not in clean_name.lower():
+                        ip_names[ip] = f"{clean_name} ({model_str})"
+                    elif clean_name:
+                        # Don't overwrite an existing detailed name with a generic one
+                        if ip not in ip_names or len(clean_name) > len(ip_names[ip]):
+                            ip_names[ip] = clean_name
             except Exception:
                 pass
 

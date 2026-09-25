@@ -47,16 +47,16 @@ class Settings(BaseSettings):
     dashboard_temp_crit_c: float = 80.0
     ble_proximity_immediate_dbm: int = -50
     ble_proximity_near_dbm: int = -70
-    sweep_interval_minutes: int = 5
+    sweep_interval_minutes: int = 10  # Reduced from 5 to ease WiFi contention
     device_offline_grace_minutes: int = 45
     speedtest_interval_hours: int = 3
     cpu_warn_percent: float = 85.0
     ram_warn_percent: float = 85.0
     disk_warn_percent: float = 90.0
     resource_alert_cooldown_hours: float = 1.0
-    watched_services: List[str] = ["overwatcher-dashboard", "overwatcher-caddy", "overwatcher-sniffer"]
-    quiet_hours_start: int = 1
-    quiet_hours_end: int = 5
+    watched_services: List[str] = ["overwatcher-dashboard", "overwatcher-caddy"]  # sniffer removed
+    quiet_hours_start: int = 22  # Extended quiet window (22:00 → 06:00)
+    quiet_hours_end: int = 6
     network_jitter_threshold_ms: float = 50.0
     api_token: str
     api_port: int = 8000

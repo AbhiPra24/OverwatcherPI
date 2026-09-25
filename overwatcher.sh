@@ -7,7 +7,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 ACTION=$1
-SERVICES="overwatcher overwatcher-sniffer overwatcher-dashboard overwatcher-caddy"
+SERVICES="overwatcher overwatcher-dashboard overwatcher-caddy"  # sniffer removed
 DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 install_services() {
@@ -33,7 +33,7 @@ EOF
 
     # Copy all services
     cp "$DIR/overwatcher.service" /etc/systemd/system/
-    cp "$DIR/overwatcher-sniffer.service" /etc/systemd/system/
+    # overwatcher-sniffer.service intentionally removed — decommissioned
     cp "$DIR/overwatcher-dashboard.service" /etc/systemd/system/
     cp "$DIR/overwatcher-caddy.service" /etc/systemd/system/
     

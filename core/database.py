@@ -354,7 +354,12 @@ class DatabaseManager:
                 INSERT INTO bt_devices (address, name, rssi, last_seen, manufacturer_data_hex, service_uuids, tx_power, rssi_history, fingerprint)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 ON CONFLICT(address) DO UPDATE SET
-                    name = CASE WHEN excluded.name != 'Unknown' AND excluded.name != '' THEN excluded.name ELSE bt_devices.name END,
+                    name = CASE
+                        WHEN excluded.name IS NOT NULL AND excluded.name != 'Unknown' AND excluded.name != '' AND (
+                            bt_devices.name IS NULL OR bt_devices.name = 'Unknown' OR bt_devices.name = 'Apple, Inc.' OR bt_devices.name = 'Apple device (nearby)' OR bt_devices.name = 'Apple device (action)'
+                        ) THEN excluded.name
+                        ELSE bt_devices.name
+                    END,
                     rssi = excluded.rssi,
                     last_seen = excluded.last_seen,
                     manufacturer_data_hex = CASE WHEN excluded.manufacturer_data_hex IS NOT NULL THEN excluded.manufacturer_data_hex ELSE bt_devices.manufacturer_data_hex END,
