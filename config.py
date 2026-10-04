@@ -53,8 +53,7 @@ class Settings(BaseSettings):
     cpu_warn_percent: float = 85.0
     ram_warn_percent: float = 85.0
     disk_warn_percent: float = 90.0
-    resource_alert_cooldown_hours: float = 1.0
-    watched_services: List[str] = ["overwatcher-dashboard", "overwatcher-caddy"]  # sniffer removed
+    watched_services: List[str] = []  # dashboard & caddy removed
     quiet_hours_start: int = 22  # Extended quiet window (22:00 → 06:00)
     quiet_hours_end: int = 6
     network_jitter_threshold_ms: float = 50.0
