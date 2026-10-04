@@ -234,10 +234,8 @@ See [`docs/docker.md`](docs/docker.md) for the full migration guide, healthcheck
    ```bash
    sudo cp overwatcher.service /etc/systemd/system/
    sudo cp overwatcher-sniffer.service /etc/systemd/system/
-   sudo cp overwatcher-dashboard.service /etc/systemd/system/
-   sudo cp overwatcher-caddy.service /etc/systemd/system/
    sudo systemctl daemon-reload
-   sudo systemctl enable --now overwatcher overwatcher-sniffer overwatcher-dashboard overwatcher-caddy
+   sudo systemctl enable --now overwatcher overwatcher-sniffer
    ```
 
 </details>

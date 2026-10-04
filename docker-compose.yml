@@ -33,34 +33,4 @@ services:
       retries: 3
       start_period: 2m
 
-  dashboard:
-    build:
-      context: .
-      dockerfile: dashboard/Dockerfile
-    container_name: overwatcher-dashboard
-    # No ports: — intentionally not published to host.
-    # Caddy reaches it via the internal network only.
-    env_file: .env
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-    # Exposed to localhost only so Caddy on host network can reach it
-    ports:
-      - "127.0.0.1:8501:8501"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
-      interval: 1m
-      timeout: 5s
-      retries: 3
-      start_period: 30s
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: overwatcher-caddy
-    network_mode: host
-    volumes:
-      - ./dashboard/Caddyfile:/etc/caddy/Caddyfile:ro
-    depends_on:
-      - dashboard
-    restart: unless-stopped
