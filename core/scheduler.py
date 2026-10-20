@@ -167,7 +167,6 @@ async def scheduled_speedtest_job(app: Application):
         st = speedtest.Speedtest()
         
         st.get_servers()
-        st.get_best_server(st.get_servers())
         server = st.get_best_server()
         ping = server.get("latency", 0)
         
@@ -338,12 +337,21 @@ async def resource_health_job(app: Application):
             alerts.append(f"⚠️ <b>High Disk Usage:</b> {status.disk_percent:.1f}%")
             
     # Check Throttling
-    if "⚠️" in status.throttling_status and "occurred" in status.throttling_status.lower():
-        if await DatabaseManager.should_alert_resource("throttling_occurred", config.resource_alert_cooldown_hours):
-            alerts.append(f"⚠️ <b>System Throttling Occurred:</b> {status.throttling_status}")
-    elif "⚠️" in status.throttling_status:
+    status_lower = status.throttling_status.lower()
+    active_indicators = ["currently throttled", "arm frequency capped", "under-voltage detected", "soft temperature limit active"]
+    has_active = any(ind in status_lower for ind in active_indicators)
+
+    if has_active:
         if await DatabaseManager.should_alert_resource("throttling_active", config.resource_alert_cooldown_hours):
             alerts.append(f"🚨 <b>Active System Throttling:</b> {status.throttling_status}")
+    elif "⚠️" in status.throttling_status and "occurred" in status_lower:
+        # Historical flags remain latched in kernel registers until reboot.
+        # Alert at most once per boot cycle to prevent repetitive hourly bombardment.
+        boot_time = time.time() - status.uptime_seconds
+        last_alert = await DatabaseManager.get_resource_last_alert("throttling_occurred")
+        if last_alert is None or last_alert < boot_time:
+            if await DatabaseManager.should_alert_resource("throttling_occurred", 0):
+                alerts.append(f"⚠️ <b>System Throttling Occurred:</b> {status.throttling_status}")
 
     if alerts:
         msg = "🔧 <b>System Resource Alert</b>\n" + "\n".join(alerts)

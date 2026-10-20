@@ -129,7 +129,6 @@ async def speedtest_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # timeout). Instead: load all servers, sort by distance, probe the
         # 5 closest, and pick the one with the lowest real latency.
         st.get_servers()
-        st.get_best_server(st.get_servers())
         server = st.get_best_server()
         ping = server.get("latency", 0)
         # Sanity check: if latency is absurdly high (>5000 ms), the server

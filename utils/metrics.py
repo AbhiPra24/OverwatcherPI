@@ -47,8 +47,15 @@ def get_soc_temp() -> float:
                 pass
     return 0.0
 
-def get_throttling_status() -> str:
+def get_throttling_status(ignore_undervoltage: bool | None = None) -> str:
     """Read Raspberry Pi throttling status via vcgencmd."""
+    if ignore_undervoltage is None:
+        try:
+            from config import config
+            ignore_undervoltage = getattr(config, "ignore_undervoltage", False)
+        except Exception:
+            ignore_undervoltage = False
+
     try:
         output = subprocess.check_output(["vcgencmd", "get_throttled"], stderr=subprocess.STDOUT, text=True)
         if "throttled=" in output:
@@ -58,7 +65,7 @@ def get_throttling_status() -> str:
                 return "✅ Normal"
             
             issues = []
-            if val & 0x1:
+            if val & 0x1 and not ignore_undervoltage:
                 issues.append("Under-voltage detected")
             if val & 0x2:
                 issues.append("ARM frequency capped")
@@ -66,7 +73,7 @@ def get_throttling_status() -> str:
                 issues.append("Currently throttled")
             if val & 0x8:
                 issues.append("Soft temperature limit active")
-            if val & 0x10000:
+            if val & 0x10000 and not ignore_undervoltage:
                 issues.append("Under-voltage occurred")
             if val & 0x20000:
                 issues.append("ARM frequency capping occurred")

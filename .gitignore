@@ -32,3 +32,4 @@ logs.bak/
 # Build artifacts
 build/
 *.egg-info/
+*.log

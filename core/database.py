@@ -619,6 +619,11 @@ class DatabaseManager:
         return False
 
     @classmethod
+    async def get_resource_last_alert(cls, metric_key: str) -> Optional[float]:
+        pool = get_pool()
+        return await pool.fetchval("SELECT last_alert_at FROM resource_alert_cooldown WHERE metric_key = $1", metric_key)
+
+    @classmethod
     async def should_alert_resource(cls, metric_key: str, cooldown_hours: float) -> bool:
         pool = get_pool()
         current_time = time.time()
