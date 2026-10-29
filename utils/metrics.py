@@ -150,10 +150,14 @@ def get_service_status(service_name: str) -> str:
         return "unknown"
 
 def get_pi_model() -> str:
-    try:
-        return Path("/sys/firmware/devicetree/base/model").read_text().strip('\x00').strip()
-    except Exception:
-        return "Unknown"
+    for model_path in ["/etc/pi-model", "/proc/device-tree/model", "/sys/firmware/devicetree/base/model"]:
+        try:
+            val = Path(model_path).read_text().strip('\x00').strip()
+            if val:
+                return val
+        except Exception:
+            pass
+    return "Unknown"
 
 def get_voltage() -> float | None:
     try:
