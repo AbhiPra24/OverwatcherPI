@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -33,11 +34,12 @@ async def fast_sweep_job(app: Application):
     except Exception as e:
         logger.error(f"Sweep failed: {e}")
         try:
-            await broadcast_message(
-                app,
-                text=f"⚠️ <b>Network Sweep Failed:</b> {e}",
-                parse_mode=ParseMode.HTML
-            )
+            if await DatabaseManager.should_alert_resource("network_sweep_failure", 0.5):
+                await broadcast_message(
+                    app,
+                    text=f"⚠️ <b>Network Sweep Failed:</b> {e}",
+                    parse_mode=ParseMode.HTML
+                )
         except Exception:
             pass
         return
@@ -68,12 +70,26 @@ async def fast_sweep_job(app: Application):
                         await DatabaseManager.queue_deferred_scan(d.mac, d.ip)
                         cmd = ["nmap", "-sn", d.ip]
                         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-                        await asyncio.wait_for(process.communicate(), timeout=30.0)
+                        try:
+                            await asyncio.wait_for(process.communicate(), timeout=30.0)
+                        except asyncio.TimeoutError:
+                            try:
+                                process.kill()
+                            except ProcessLookupError:
+                                pass
+                            await process.communicate()
                         open_ports.append("Scan deferred (high network load)")
                     else:
                         cmd = ["nmap", "-F", "-T4", "--open", d.ip]
                         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-                        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+                        try:
+                            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+                        except asyncio.TimeoutError:
+                            try:
+                                process.kill()
+                            except ProcessLookupError:
+                                pass
+                            stdout, stderr = await process.communicate()
                         if process.returncode == 0:
                             for line in stdout.decode('utf-8').splitlines():
                                 if "/tcp" in line and "open" in line:
@@ -513,7 +529,14 @@ async def deferred_scan_job(app: Application):
         try:
             cmd = ["nmap", "-sV", "-T3", "--open", ip]
             process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300.0)
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300.0)
+            except asyncio.TimeoutError:
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+                stdout, stderr = await process.communicate()
             if process.returncode == 0:
                 for line in stdout.decode('utf-8').splitlines():
                     if "/tcp" in line and "open" in line:

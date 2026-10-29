@@ -14,17 +14,25 @@ services:
       - NET_RAW
       - NET_ADMIN
     group_add:
-      - "986"
+      - "44"   # video group for /dev/vcio access by vcgencmd
+      - "988"  # docker group for /var/run/docker.sock
     env_file: .env
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - /var/run/dbus:/var/run/dbus  # BlueZ D-Bus passthrough (see docs/docker.md)
       - /usr/bin/vcgencmd:/usr/bin/vcgencmd:ro  # Pi throttling/temp queries
+      - /lib/aarch64-linux-gnu/libvchiq_arm.so:/lib/aarch64-linux-gnu/libvchiq_arm.so:ro
+      - /lib/aarch64-linux-gnu/libvcos.so:/lib/aarch64-linux-gnu/libvcos.so:ro
+      - /proc/device-tree/model:/etc/pi-model:ro
       - /var/log/auth.log:/var/log/auth.log:ro  # SSH watcher
       - /var/run/docker.sock:/var/run/docker.sock:ro  # docker socket for container health checks
     devices:
       - /dev/vcio:/dev/vcio  # required by vcgencmd
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "healthcheck.py"]

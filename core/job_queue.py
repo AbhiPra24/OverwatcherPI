@@ -67,6 +67,7 @@ async def job_worker(app_or_bot):
 
         await db.execute("UPDATE jobs SET status = 'running', started_at = $1 WHERE id = $2", time.time(), job_id)
 
+        proc = None
         try:
             import shlex
             args = shlex.split(command)
@@ -80,7 +81,10 @@ async def job_worker(app_or_bot):
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300) # 5 min timeout
             except asyncio.TimeoutError:
-                proc.kill()
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
                 stdout, stderr = await proc.communicate()
                 stderr += b"\nTimeout reached."
 
@@ -119,13 +123,22 @@ async def job_worker(app_or_bot):
 
         except Exception as e:
             logger.error(f"Job {job_id} failed: {e}")
+            if proc is not None and proc.returncode is None:
+                try:
+                    proc.kill()
+                    await proc.wait()
+                except Exception:
+                    pass
             await db.execute("""
                 UPDATE jobs
                 SET status = 'failed', error = $1, finished_at = $2
                 WHERE id = $3
             """, str(e), time.time(), job_id)
             from telegram.constants import ParseMode
-            await app_or_bot.bot.send_message(chat_id=chat_id, text=f"❌ Job `{job_id}` failed: {e}", parse_mode=ParseMode.MARKDOWN)
+            try:
+                await app_or_bot.bot.send_message(chat_id=chat_id, text=f"❌ Job `{job_id}` failed: {e}", parse_mode=ParseMode.MARKDOWN)
+            except Exception as alert_err:
+                logger.error(f"Failed to send failure alert for job {job_id}: {alert_err}")
 
         finally:
             ACTIVE_PROCESSES.pop(job_id, None)
