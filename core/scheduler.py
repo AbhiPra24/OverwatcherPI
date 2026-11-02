@@ -284,12 +284,19 @@ async def latency_quality_job(app: Application):
     await DatabaseManager.record_scan_heartbeat("latency_quality")
 
 _down_services = set()
+_down_containers = set()
 async def service_watchdog_job(app: Application):
-    from utils.metrics import get_service_status
+    from utils.metrics import (
+        get_service_status,
+        get_all_docker_containers,
+        get_docker_container_logs,
+        triage_container_incident,
+    )
     from bot.broadcaster import broadcast_message
     from telegram.constants import ParseMode
     import asyncio
     
+    # 1. Monitored systemd / named services from config
     for svc in config.watched_services:
         status = await asyncio.to_thread(get_service_status, svc)
         is_active = status == "active"
@@ -316,6 +323,57 @@ async def service_watchdog_job(app: Application):
                     )
                 except Exception:
                     pass
+
+    # 2. Docker Container Watchdog: Detect unhealthy containers or exit code != 0
+    try:
+        containers = await asyncio.to_thread(get_all_docker_containers)
+        for c in containers:
+            c_name = c["name"]
+            is_running = c["running"]
+            exit_code = c["exit_code"]
+            health_status = c["health_status"]
+
+            # Unhealthy condition: container exited with != 0, marked unhealthy, or died
+            is_unhealthy = (not is_running and exit_code != 0) or (
+                health_status is not None and health_status not in ("healthy", "starting")
+            )
+
+            if is_unhealthy:
+                if c_name not in _down_containers:
+                    _down_containers.add(c_name)
+                    # Capture last 25 lines of logs
+                    logs = await asyncio.to_thread(get_docker_container_logs, c_name, 25)
+                    # Pass logs directly to local Ollama with pralabs:edge and [TASK: DEVOPS_SENTINEL]
+                    triage_block = await asyncio.to_thread(triage_container_incident, c_name, logs)
+
+                    # If healthy background noise was detected, triage_block is None (suppressed)
+                    if triage_block:
+                        alert_text = (
+                            f"🚨 <b>DevOps Sentinel Incident</b>\n\n"
+                            f"<pre>{triage_block}</pre>"
+                        )
+                        try:
+                            await broadcast_message(
+                                app,
+                                text=alert_text,
+                                parse_mode=ParseMode.HTML
+                            )
+                        except Exception:
+                            pass
+            else:
+                if c_name in _down_containers:
+                    _down_containers.remove(c_name)
+                    try:
+                        await broadcast_message(
+                            app,
+                            text=f"✅ <b>Container Recovered:</b> <code>{c_name}</code> is healthy.",
+                            parse_mode=ParseMode.HTML
+                        )
+                    except Exception:
+                        pass
+    except Exception as e:
+        logger.error(f"Error in Docker watchdog evaluation: {e}")
+
     await DatabaseManager.record_scan_heartbeat("service_watchdog")
 
 async def resource_health_job(app: Application):

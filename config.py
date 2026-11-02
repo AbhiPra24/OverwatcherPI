@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     resource_alert_cooldown_hours: float = 1.0
     ignore_undervoltage: bool = True
     watched_services: List[str] = []  # dashboard & caddy removed
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "pralabs:edge"
+    ollama_triage_enabled: bool = True
     quiet_hours_start: int = 22  # Extended quiet window (22:00 → 06:00)
     quiet_hours_end: int = 6
     network_jitter_threshold_ms: float = 50.0

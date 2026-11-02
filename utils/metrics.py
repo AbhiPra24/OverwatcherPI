@@ -132,6 +132,179 @@ def get_docker_container_status(container_name: str) -> str:
     return "unknown"
 
 
+def get_docker_container_logs(container_name: str, tail: int = 25) -> str:
+    """Fetch the last `tail` lines of docker container logs via the Docker UNIX socket."""
+    import socket
+    import struct
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(3.0)
+        s.connect("/var/run/docker.sock")
+        request = f"GET /containers/{container_name}/logs?stderr=1&stdout=1&tail={tail} HTTP/1.0\r\n\r\n"
+        s.sendall(request.encode())
+        response = b""
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            response += chunk
+        s.close()
+
+        parts = response.split(b"\r\n\r\n", 1)
+        if len(parts) < 2:
+            return ""
+        header, raw = parts
+        if b"200 OK" not in header:
+            return ""
+
+        lines = []
+        offset = 0
+        while offset < len(raw):
+            if offset + 8 <= len(raw):
+                _, size = struct.unpack(">BxxxI", raw[offset:offset+8])
+                payload = raw[offset+8:offset+8+size]
+                lines.append(payload.decode("utf-8", errors="replace"))
+                offset += 8 + size
+            else:
+                lines.append(raw[offset:].decode("utf-8", errors="replace"))
+                break
+        return "".join(lines).strip()
+    except Exception:
+        return ""
+
+
+def get_all_docker_containers() -> list[dict]:
+    """Retrieve all containers and their health/exit states from Docker socket."""
+    import socket
+    import json
+    containers = []
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(2.0)
+        s.connect("/var/run/docker.sock")
+        s.sendall(b"GET /containers/json?all=1 HTTP/1.0\r\n\r\n")
+        response = b""
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            response += chunk
+        s.close()
+
+        parts = response.split(b"\r\n\r\n", 1)
+        if len(parts) >= 2 and b"200 OK" in parts[0]:
+            raw_containers = json.loads(parts[1].decode())
+            for c in raw_containers:
+                cid = c.get("Id")
+                name = c.get("Names", [""])[0].lstrip("/")
+                if not name:
+                    continue
+
+                # Inspect container to get exact exit code and health status
+                s_ins = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                s_ins.settimeout(2.0)
+                s_ins.connect("/var/run/docker.sock")
+                s_ins.sendall(f"GET /containers/{cid}/json HTTP/1.0\r\n\r\n".encode())
+                ins_resp = b""
+                while True:
+                    chunk = s_ins.recv(4096)
+                    if not chunk:
+                        break
+                    ins_resp += chunk
+                s_ins.close()
+
+                ins_parts = ins_resp.split(b"\r\n\r\n", 1)
+                if len(ins_parts) >= 2 and b"200 OK" in ins_parts[0]:
+                    details = json.loads(ins_parts[1].decode())
+                    state = details.get("State", {})
+                    health = state.get("Health", {})
+                    containers.append({
+                        "name": name,
+                        "running": state.get("Running", False),
+                        "exit_code": state.get("ExitCode", 0),
+                        "health_status": health.get("Status") if health else None,
+                        "oom_killed": state.get("OOMKilled", False),
+                        "status_str": c.get("Status", "")
+                    })
+    except Exception:
+        pass
+    return containers
+
+
+def triage_container_incident(container_name: str, logs: str) -> str | None:
+    """Pass container logs directly to local Ollama with model pralabs:edge and [TASK: DEVOPS_SENTINEL].
+
+    Returns:
+        Structured 3-line triage block or None if logs indicate healthy operation.
+    """
+    import json
+    import re
+    import urllib.request
+    from config import config
+
+    if not getattr(config, "ollama_triage_enabled", True):
+        return None
+
+    ollama_url = getattr(config, "ollama_base_url", "http://127.0.0.1:11434")
+    model = getattr(config, "ollama_model", "pralabs:edge")
+
+    prompt = (
+        "[TASK: DEVOPS_SENTINEL] You are OverwatcherPI Host Sentinel. Parse container telemetry and extract root-cause failures.\n"
+        "If the logs show normal, healthy background operations (e.g. HTTP 200 GET requests, routine heartbeats, normal metrics), you MUST output exactly: INCIDENT: NONE.\n"
+        "If a failure or crash is detected, output a clean, deterministic 3-line triage block in this exact format:\n"
+        "INCIDENT: <container> | SEVERITY: <CRITICAL/WARN>\n"
+        "ROOT_CAUSE: <exact failure mechanism e.g., OOMKilled / port conflict>\n"
+        "REMEDY: <exact command e.g., sudo systemctl restart ...>\n\n"
+        f"Container: {container_name}\n"
+        f"Logs:\n{logs}\n"
+    )
+
+    req_body = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.1,
+            "top_k": 1,
+            "top_p": 1.0,
+            "num_thread": 4,
+            "num_ctx": 2048,
+            "num_predict": 128
+        }
+    }
+
+    url = f"{ollama_url.rstrip('/')}/api/generate"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(req_body).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            raw_text = data.get("response", "").strip()
+
+            # Healthy background logs check
+            raw_upper = raw_text.upper()
+            if "INCIDENT: NONE" in raw_upper or raw_upper.startswith("INCIDENT: NONE"):
+                return None
+
+            incident_match = re.search(r"INCIDENT:\s*([^\n\r]+)", raw_text, re.IGNORECASE)
+            root_match = re.search(r"ROOT_CAUSE:\s*([^\n\r]+)", raw_text, re.IGNORECASE)
+            remedy_match = re.search(r"REMEDY:\s*([^\n\r]+)", raw_text, re.IGNORECASE)
+
+            if incident_match:
+                inc = f"INCIDENT: {incident_match.group(1).strip()}"
+                root = f"ROOT_CAUSE: {root_match.group(1).strip()}" if root_match else "ROOT_CAUSE: Container failure detected in telemetry."
+                rem = f"REMEDY: {remedy_match.group(1).strip()}" if remedy_match else f"REMEDY: docker restart {container_name}"
+                return f"{inc}\n{root}\n{rem}"
+
+            return raw_text
+    except Exception as e:
+        return f"INCIDENT: {container_name} | SEVERITY: WARN\nROOT_CAUSE: Local Ollama sentinel unreachable ({e})\nREMEDY: docker logs {container_name} --tail 50"
+
+
 def get_service_status(service_name: str) -> str:
     if Path("/var/run/docker.sock").exists():
         status = get_docker_container_status(service_name)
