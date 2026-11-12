@@ -479,13 +479,16 @@ def setup_scheduler(app: Application) -> AsyncIOScheduler:
     )
     
     # Schedule speedtest
-    scheduler.add_job(
-        scheduled_speedtest_job,
-        "interval",
-        hours=config.speedtest_interval_hours,
-        args=[app],
-        id="scheduled_speedtest"
-    )
+    if config.speedtest_enabled:
+        scheduler.add_job(
+            scheduled_speedtest_job,
+            "interval",
+            hours=config.speedtest_interval_hours,
+            args=[app],
+            id="scheduled_speedtest"
+        )
+    else:
+        logger.info("Scheduled speedtest is disabled in config.")
 
     # Schedule Ping Monitor (every 1 minute)
     scheduler.add_job(

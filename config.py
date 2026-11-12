@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     ssh_alert_cooldown_seconds: float = 900.0  # 15 minutes cooldown per IP
     ssh_whitelist_ips: List[str] = []
     device_offline_grace_minutes: int = 45
+    speedtest_enabled: bool = False
     speedtest_interval_hours: int = 3
     cpu_warn_percent: float = 85.0
     ram_warn_percent: float = 85.0
