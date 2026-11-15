@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     ble_proximity_immediate_dbm: int = -50
     ble_proximity_near_dbm: int = -70
     sweep_interval_minutes: int = 10  # Reduced from 5 to ease WiFi contention
+    ssh_login_alert_enabled: bool = True
+    ssh_alert_cooldown_seconds: float = 900.0  # 15 minutes cooldown per IP
+    ssh_whitelist_ips: List[str] = []
     device_offline_grace_minutes: int = 45
     speedtest_interval_hours: int = 3
     cpu_warn_percent: float = 85.0
@@ -75,8 +78,8 @@ class Settings(BaseSettings):
                 raise ValueError(f"Honeypot port {port} collides with a restricted service port (8501, 8109, 8000, 22).")
         return v
 
-    @field_validator("watched_services", mode="before")
-    def parse_watched_services(cls, v):
+    @field_validator("watched_services", "ssh_whitelist_ips", mode="before")
+    def parse_list_fields(cls, v):
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("[") and v.endswith("]"):

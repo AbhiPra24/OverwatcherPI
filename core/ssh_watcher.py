@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 from core.database import DatabaseManager
 from utils.osint import get_ip_info
 from bot.broadcaster import broadcast_message
+from config import config
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ async def ssh_log_watcher(app: Application):
     )
     
     failed_attempts = defaultdict(list)
+    last_success_alert = {}
     
     while True:
         line = await process.stdout.readline()
@@ -85,11 +87,26 @@ async def ssh_log_watcher(app: Application):
                             asyncio.create_task(send_alert(ip, safe_ip))
                                 
             elif "Accepted password" in line or "Accepted publickey" in line:
+                if not getattr(config, "ssh_login_alert_enabled", True):
+                    continue
+
                 parts = line.split()
                 if "from" in parts:
                     idx = parts.index("from")
                     if idx + 1 < len(parts):
                         ip = parts[idx + 1]
+                        
+                        whitelist = getattr(config, "ssh_whitelist_ips", [])
+                        if ip in whitelist:
+                            continue
+
+                        now = time.time()
+                        cooldown = getattr(config, "ssh_alert_cooldown_seconds", 900.0)
+                        last_alert = last_success_alert.get(ip, 0)
+                        if now - last_alert < cooldown:
+                            continue
+
+                        last_success_alert[ip] = now
                         safe_ip = html.escape(ip)
                         try:
                             await broadcast_message(

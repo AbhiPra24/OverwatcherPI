@@ -34,3 +34,25 @@ def test_missing_dashboard_password():
     with pytest.raises(ValidationError) as exc:
         Settings(telegram_owner_ids="123", telegram_bot_token="dummy", api_token="dummy", _env_file=None)
     assert "dashboard_password" in str(exc.value)
+
+def test_parse_ssh_whitelist_ips():
+    s1 = Settings(
+        ssh_whitelist_ips="192.168.1.18, 192.168.1.50",
+        api_token="dummy",
+        dashboard_password="dummy",
+        telegram_owner_ids="1",
+        telegram_bot_token="x",
+        _env_file=None
+    )
+    assert s1.ssh_whitelist_ips == ["192.168.1.18", "192.168.1.50"]
+
+    s2 = Settings(
+        ssh_whitelist_ips='["192.168.1.18"]',
+        api_token="dummy",
+        dashboard_password="dummy",
+        telegram_owner_ids="1",
+        telegram_bot_token="x",
+        _env_file=None
+    )
+    assert s2.ssh_whitelist_ips == ["192.168.1.18"]
+
