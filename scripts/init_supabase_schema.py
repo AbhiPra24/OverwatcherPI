@@ -1,6 +1,6 @@
 """One-off schema setup for the Supabase (Postgres) migration.
 
-Run via: docker compose run --rm bot python -m scripts.init_supabase_schema
+Run via: python -m scripts.init_supabase_schema
 Safe to rerun — every statement is CREATE TABLE IF NOT EXISTS.
 """
 

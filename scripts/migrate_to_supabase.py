@@ -1,6 +1,6 @@
 """One-time data migration from SQLite to Supabase (Postgres).
 
-Run via: docker compose run --rm bot python -m scripts.migrate_to_supabase [--truncate]
+Run via: python -m scripts.migrate_to_supabase [--truncate]
 
 Reads every row from the live SQLite file, writes it to Supabase. Unlike
 PortfolioPi's equivalent script, no timestamp-string parsing is needed here —
