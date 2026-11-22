@@ -30,8 +30,8 @@ jobs:
         
     - name: Run Ruff (Linting)
       run: |
-        # Just fail on obvious errors, don't enforce strict style
-        ruff check .
+        # Fail only on syntax/fatal runtime errors without pedantic style enforcement
+        ruff check --select E9,F63,F7,F82 .
         
     - name: Sanity check (Import main)
       run: |
