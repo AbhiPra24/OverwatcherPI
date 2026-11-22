@@ -33,16 +33,19 @@ jobs:
         # Fail only on syntax/fatal runtime errors without pedantic style enforcement
         ruff check --select E9,F63,F7,F82 .
         
+    - name: Setup environment file
+      run: |
+        # Generate dummy .env from example to satisfy required fields and config initialization
+        cp .env.example .env
+
+    - name: Sanity check (Config parsing)
+      run: |
+        python -c "from config import config; print('Config loaded successfully')"
+
     - name: Sanity check (Import main)
       run: |
         # Catches import-time errors (missing modules, syntax errors) before running tests
         python -c "import main"
-        
-    - name: Sanity check (Config parsing)
-      run: |
-        # Generate dummy .env from example to satisfy required fields and config initialization
-        cp .env.example .env
-        python -c "from config import config; print('Config loaded successfully')"
         
     - name: Run Pytest
       run: |
