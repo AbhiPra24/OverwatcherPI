@@ -1,5 +1,5 @@
 from pydantic import Field, SecretStr, field_validator
-from typing import List
+from typing import List, Union
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
@@ -12,11 +12,12 @@ class Settings(BaseSettings):
     )
 
     telegram_bot_token: SecretStr
-    telegram_owner_ids: List[int]
+    telegram_owner_ids: Union[List[int], str]
 
     @field_validator("telegram_owner_ids", mode="before")
     def parse_owner_ids(cls, v):
         if isinstance(v, str):
+            v = v.strip("[] \t\r\n")
             return [int(x.strip()) for x in v.split(",") if x.strip()]
         if isinstance(v, int):
             return [v]
@@ -50,7 +51,7 @@ class Settings(BaseSettings):
     sweep_interval_minutes: int = 10  # Reduced from 5 to ease WiFi contention
     ssh_login_alert_enabled: bool = True
     ssh_alert_cooldown_seconds: float = 900.0  # 15 minutes cooldown per IP
-    ssh_whitelist_ips: List[str] = []
+    ssh_whitelist_ips: Union[List[str], str] = []
     device_offline_grace_minutes: int = 45
     speedtest_enabled: bool = False
     speedtest_interval_hours: int = 3
@@ -59,7 +60,7 @@ class Settings(BaseSettings):
     disk_warn_percent: float = 90.0
     resource_alert_cooldown_hours: float = 1.0
     ignore_undervoltage: bool = True
-    watched_services: List[str] = []  # dashboard & caddy removed
+    watched_services: Union[List[str], str] = []  # dashboard & caddy removed
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "pralabs:edge"
     ollama_triage_enabled: bool = True
@@ -69,7 +70,7 @@ class Settings(BaseSettings):
     api_token: str
     api_port: int = 8000
     honeypot_enabled: bool = False
-    honeypot_ports: List[int] = [2323, 8445, 8389]
+    honeypot_ports: Union[List[int], str] = [2323, 8445, 8389]
 
     @field_validator("honeypot_ports", mode="after")
     def validate_honeypot_ports(cls, v):
