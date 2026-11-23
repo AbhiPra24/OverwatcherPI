@@ -232,11 +232,6 @@ def get_all_docker_containers() -> list[dict]:
 
 
 def triage_container_incident(container_name: str, logs: str) -> str | None:
-    """Pass container logs directly to local Ollama with model pralabs:edge and [TASK: DEVOPS_SENTINEL].
-
-    Returns:
-        Structured 3-line triage block or None if logs indicate healthy operation.
-    """
     import json
     import re
     import urllib.request
@@ -245,8 +240,10 @@ def triage_container_incident(container_name: str, logs: str) -> str | None:
     if not getattr(config, "ollama_triage_enabled", True):
         return None
 
-    ollama_url = getattr(config, "ollama_base_url", "http://127.0.0.1:11434")
-    model = getattr(config, "ollama_model", "pralabs:edge")
+    endpoints = [
+        (getattr(config, "ollama_base_url", "http://127.0.0.1:11435"), getattr(config, "ollama_model", "pralabs:edge")),
+        (getattr(config, "ollama_fallback_url", "http://127.0.0.1:11434"), getattr(config, "ollama_fallback_model", "pralabs:edge")),
+    ]
 
     prompt = (
         "[TASK: DEVOPS_SENTINEL] You are OverwatcherPI Host Sentinel. Parse container telemetry and extract root-cause failures.\n"
@@ -259,50 +256,54 @@ def triage_container_incident(container_name: str, logs: str) -> str | None:
         f"Logs:\n{logs}\n"
     )
 
-    req_body = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "options": {
-            "temperature": 0.1,
-            "top_k": 1,
-            "top_p": 1.0,
-            "num_thread": 4,
-            "num_ctx": 2048,
-            "num_predict": 128
+    last_err = None
+    for ollama_url, model in endpoints:
+        if not ollama_url:
+            continue
+        req_body = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.1,
+                "top_k": 1,
+                "top_p": 1.0,
+                "num_thread": 4,
+                "num_ctx": 2048,
+                "num_predict": 128
+            }
         }
-    }
+        url = f"{ollama_url.rstrip('/')}/api/generate"
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(req_body).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                raw_text = data.get("response", "").strip()
 
-    url = f"{ollama_url.rstrip('/')}/api/generate"
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(req_body).encode("utf-8"),
-        headers={"Content-Type": "application/json"}
-    )
+                raw_upper = raw_text.upper()
+                if "INCIDENT: NONE" in raw_upper or raw_upper.startswith("INCIDENT: NONE"):
+                    return None
 
-    try:
-        with urllib.request.urlopen(req, timeout=30.0) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            raw_text = data.get("response", "").strip()
+                incident_match = re.search(r"INCIDENT:\s*([^\n\r]+)", raw_text, re.IGNORECASE)
+                root_match = re.search(r"ROOT_CAUSE:\s*([^\n\r]+)", raw_text, re.IGNORECASE)
+                remedy_match = re.search(r"REMEDY:\s*([^\n\r]+)", raw_text, re.IGNORECASE)
 
-            # Healthy background logs check
-            raw_upper = raw_text.upper()
-            if "INCIDENT: NONE" in raw_upper or raw_upper.startswith("INCIDENT: NONE"):
-                return None
+                if incident_match:
+                    inc = f"INCIDENT: {incident_match.group(1).strip()}"
+                    root = f"ROOT_CAUSE: {root_match.group(1).strip()}" if root_match else "ROOT_CAUSE: Container failure detected in telemetry."
+                    rem = f"REMEDY: {remedy_match.group(1).strip()}" if remedy_match else f"REMEDY: docker restart {container_name}"
+                    return f"{inc}\n{root}\n{rem}"
 
-            incident_match = re.search(r"INCIDENT:\s*([^\n\r]+)", raw_text, re.IGNORECASE)
-            root_match = re.search(r"ROOT_CAUSE:\s*([^\n\r]+)", raw_text, re.IGNORECASE)
-            remedy_match = re.search(r"REMEDY:\s*([^\n\r]+)", raw_text, re.IGNORECASE)
+                return raw_text
+        except Exception as e:
+            last_err = e
+            continue
 
-            if incident_match:
-                inc = f"INCIDENT: {incident_match.group(1).strip()}"
-                root = f"ROOT_CAUSE: {root_match.group(1).strip()}" if root_match else "ROOT_CAUSE: Container failure detected in telemetry."
-                rem = f"REMEDY: {remedy_match.group(1).strip()}" if remedy_match else f"REMEDY: docker restart {container_name}"
-                return f"{inc}\n{root}\n{rem}"
-
-            return raw_text
-    except Exception as e:
-        return f"INCIDENT: {container_name} | SEVERITY: WARN\nROOT_CAUSE: Local Ollama sentinel unreachable ({e})\nREMEDY: docker logs {container_name} --tail 50"
+    return f"INCIDENT: {container_name} | SEVERITY: WARN\nROOT_CAUSE: Ollama sentinel unreachable ({last_err})\nREMEDY: docker logs {container_name} --tail 50"
 
 
 def get_service_status(service_name: str) -> str:

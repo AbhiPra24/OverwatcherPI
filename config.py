@@ -61,8 +61,12 @@ class Settings(BaseSettings):
     resource_alert_cooldown_hours: float = 1.0
     ignore_undervoltage: bool = True
     watched_services: Union[List[str], str] = []  # dashboard & caddy removed
-    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_base_url: str = "http://127.0.0.1:11435"
     ollama_model: str = "pralabs:edge"
+    ollama_fallback_url: str = "http://127.0.0.1:11434"
+    ollama_fallback_model: str = "pralabs:edge"
+    litellm_base_url: str = "http://127.0.0.1:14000/v1"
+    litellm_api_key: str = ""
     ollama_triage_enabled: bool = True
     quiet_hours_start: int = 22  # Extended quiet window (22:00 → 06:00)
     quiet_hours_end: int = 6
